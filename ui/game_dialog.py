@@ -10,6 +10,7 @@ from ui.context import AppContext
 from ui.icons import G
 from ui.widgets import Avatar, GameCover, make_card, muted_label, styled_button
 from ui.workers import run_async
+from utils.i18n import t
 
 
 class GameProfileDialog(QDialog):
@@ -20,7 +21,7 @@ class GameProfileDialog(QDialog):
         self.game = GameProfile.from_dict(game.to_dict()) if game else GameProfile(name="", link=preset_link)
         if preset_accounts and not game:
             self.game.account_ids = list(preset_accounts)
-        self.setWindowTitle("Editar perfil de juego" if game else "Nuevo perfil de juego")
+        self.setWindowTitle(t("Editar perfil de juego") if game else t("Nuevo perfil de juego"))
         self.setMinimumWidth(720)
         g = self.game
 
@@ -37,23 +38,23 @@ class GameProfileDialog(QDialog):
         form = QFormLayout()
         form.setHorizontalSpacing(12)
         self.name = QLineEdit(g.name)
-        self.name.setPlaceholderText("Nombre del perfil (se rellena solo al detectar el juego)")
+        self.name.setPlaceholderText(t("Nombre del perfil (se rellena solo al detectar el juego)"))
         self.link = QLineEdit(g.link)
-        self.link.setPlaceholderText("PlaceId o enlace del juego / servidor privado / share")
+        self.link.setPlaceholderText(t("PlaceId o enlace del juego / servidor privado / share"))
         self.link.editingFinished.connect(self._auto_detect)
         link_row = QHBoxLayout()
         link_row.addWidget(self.link, 1)
-        self.detect_btn = styled_button("Detectar", "", self.detect, icon=G.SYNC)
-        self.detect_btn.setToolTip("Busca en Roblox el nombre y el icono del juego")
+        self.detect_btn = styled_button(t("Detectar"), "", self.detect, icon=G.SYNC)
+        self.detect_btn.setToolTip(t("Busca en Roblox el nombre y el icono del juego"))
         link_row.addWidget(self.detect_btn)
         self.job = QLineEdit(g.job_id)
-        self.job.setPlaceholderText("Opcional: entrar a un servidor concreto")
+        self.job.setPlaceholderText(t("Opcional: entrar a un servidor concreto"))
         self.private = QLineEdit(g.private_code)
-        self.private.setPlaceholderText("Opcional: código de servidor privado (linkCode)")
-        form.addRow("Nombre", self.name)
-        form.addRow("Juego", link_row)
+        self.private.setPlaceholderText(t("Opcional: código de servidor privado (linkCode)"))
+        form.addRow(t("Nombre"), self.name)
+        form.addRow(t("Juego"), link_row)
         form.addRow("JobId", self.job)
-        form.addRow("Servidor privado", self.private)
+        form.addRow(t("Servidor privado"), self.private)
         top.addLayout(form, 1)
         lay.addLayout(top)
         self.detect_status = muted_label("")
@@ -66,7 +67,7 @@ class GameProfileDialog(QDialog):
 
         card, lay = make_card(14, 8)
         head = QHBoxLayout()
-        title = QLabel("Cuentas que entran")
+        title = QLabel(t("Cuentas que entran"))
         title.setObjectName("CardTitle")
         head.addWidget(title)
         head.addStretch(1)
@@ -88,16 +89,16 @@ class GameProfileDialog(QDialog):
         self.accounts.itemChanged.connect(lambda _: self._update_count())
         lay.addWidget(self.accounts)
         if not ctx.vault.accounts:
-            lay.addWidget(muted_label("Todavía no tienes cuentas. Agrégalas en Inicio y vuelve aquí."))
+            lay.addWidget(muted_label(t("Todavía no tienes cuentas. Agrégalas en Inicio y vuelve aquí.")))
         links = QHBoxLayout()
-        links.addWidget(styled_button("Todas", "", lambda: self._check_all(True)))
-        links.addWidget(styled_button("Ninguna", "", lambda: self._check_all(False)))
+        links.addWidget(styled_button(t("Todas"), "", lambda: self._check_all(True)))
+        links.addWidget(styled_button(t("Ninguna"), "", lambda: self._check_all(False)))
         links.addStretch(1)
         lay.addLayout(links)
         cols.addWidget(card, 1)
 
         card, lay = make_card(14, 8)
-        title = QLabel("Automatización")
+        title = QLabel(t("Automatización"))
         title.setObjectName("CardTitle")
         lay.addWidget(title)
         form = QFormLayout()
@@ -119,17 +120,17 @@ class GameProfileDialog(QDialog):
         form.addRow("Macro", self.macro)
         form.addRow("Autoclicker", self.clicker)
         lay.addLayout(form)
-        self.auto_run = QCheckBox("Iniciarlos solos al entrar al servidor")
+        self.auto_run = QCheckBox(t("Iniciarlos solos al entrar al servidor"))
         self.auto_run.setChecked(g.auto_run)
-        self.anti_afk = QCheckBox("Anti-AFK activado")
+        self.anti_afk = QCheckBox(t("Anti-AFK activado"))
         self.anti_afk.setChecked(g.anti_afk)
-        self.reconnect = QCheckBox("Reconectar si se cae")
+        self.reconnect = QCheckBox(t("Reconectar si se cae"))
         self.reconnect.setChecked(g.auto_reconnect)
         for box in (self.auto_run, self.anti_afk, self.reconnect):
             lay.addWidget(box)
-        lay.addWidget(muted_label("★ = macros guardadas en este juego. Si no eliges nada, se usa la "
-                                  "macro de cada cuenta."))
-        lay.addWidget(QLabel("Notas"))
+        lay.addWidget(muted_label(t("★ = macros guardadas en este juego. Si no eliges nada, se usa la "
+                                  "macro de cada cuenta.")))
+        lay.addWidget(QLabel(t("Notas")))
         self.notes = QPlainTextEdit(g.notes)
         self.notes.setFixedHeight(60)
         lay.addWidget(self.notes)
@@ -139,8 +140,8 @@ class GameProfileDialog(QDialog):
 
         row = QHBoxLayout()
         row.addStretch(1)
-        row.addWidget(styled_button("Cancelar", "", self.reject))
-        save = styled_button("Guardar perfil", "secondary", self._save, icon=G.CHECK)
+        row.addWidget(styled_button(t("Cancelar"), "", self.reject))
+        save = styled_button(t("Guardar perfil"), "secondary", self._save, icon=G.CHECK)
         save.setDefault(True)
         row.addWidget(save)
         outer.addLayout(row)
@@ -185,24 +186,24 @@ class GameProfileDialog(QDialog):
     def detect(self) -> None:
         place_id = self._place_id()
         if not place_id:
-            self.detect_status.setText("Pega un PlaceId o un enlace de juego válido para detectarlo.")
+            self.detect_status.setText(t("Pega un PlaceId o un enlace de juego válido para detectarlo."))
             return
         self.detect_btn.setEnabled(False)
-        self.detect_status.setText("Buscando el juego en Roblox…")
+        self.detect_status.setText(t("Buscando el juego en Roblox…"))
         self._refresh_cover()
 
         def done(info: dict):
             self.detect_btn.setEnabled(True)
             if not self.name.text().strip():
                 self.name.setText(info["name"])
-            extra = f" · de {info['creator']}" if info.get("creator") else ""
+            extra = t(" · de {0}", info['creator']) if info.get("creator") else ""
             self.detect_status.setText(f"✔ {info['name']}{extra} · {info.get('playing', 0):,} jugando ahora"
                                        .replace(",", "."))
             self._refresh_cover()
 
         def fail(exc):
             self.detect_btn.setEnabled(True)
-            self.detect_status.setText(f"No se pudo detectar: {exc}")
+            self.detect_status.setText(t("No se pudo detectar: {0}", exc))
 
         run_async(roblox_api.game_info, place_id, on_done=done, on_error=fail)
 
@@ -210,7 +211,7 @@ class GameProfileDialog(QDialog):
         try:
             target = parse_target(self.link.text(), self.job.text(), self.private.text())
         except ValueError as exc:
-            QMessageBox.warning(self, "Enlace no válido", str(exc))
+            QMessageBox.warning(self, t("Enlace no válido"), str(exc))
             return
         name = self.name.text().strip() or target.label
         g = self.game

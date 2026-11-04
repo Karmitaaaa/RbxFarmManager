@@ -128,6 +128,12 @@ QToolTip {{ background: #191919; color: #FFFFFF; border: none; padding: 4px 8px;
 }}
 #GameCard:hover {{ border-color: {blue}; }}
 #GameCard QLabel {{ background: transparent; }}
+#Chip {{ background: {hover}; color: {muted}; border-radius: 9px; padding: 2px 8px; font-size: 8.5pt; }}
+#ChipToggle {{
+    background: transparent; color: {muted}; border: 1px solid {card_border}; border-radius: 9px;
+    padding: 1px 7px; min-height: 16px; font-size: 8.5pt; font-weight: 600;
+}}
+#ChipToggle:checked {{ background: {selection}; color: {selection_text}; border-color: {blue}; }}
 #AddCard {{ background: transparent; border: 2px dashed {faint}; border-radius: 6px; }}
 #AddCard:hover {{ border-color: {blue}; background: {card}; }}
 

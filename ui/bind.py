@@ -2,6 +2,7 @@
 from PySide6.QtWidgets import QCheckBox, QComboBox, QDoubleSpinBox, QSpinBox
 
 from storage.config import Config
+from utils.i18n import t
 
 
 def spin(cfg: Config, key: str, lo: int, hi: int, suffix: str = "", step: int = 1) -> QSpinBox:
@@ -48,7 +49,7 @@ def check(cfg: Config, key: str, text: str, on_change=None) -> QCheckBox:
 def combo(cfg: Config, key: str, items: dict, on_change=None) -> QComboBox:
     w = QComboBox()
     for value, label in items.items():
-        w.addItem(label, value)
+        w.addItem(t(label), value)
     w.reload = lambda: w.setCurrentIndex(max(0, w.findData(cfg.get(key))))
     w.reload()
 

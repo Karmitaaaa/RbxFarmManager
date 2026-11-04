@@ -13,6 +13,7 @@ import psutil
 from core.models import LaunchTarget
 from utils.paths import roblox_local_dir
 from utils.winapi import ROBLOX_EXE
+from utils.i18n import t
 
 log = logging.getLogger(__name__)
 
@@ -25,7 +26,7 @@ def parse_target(link: str, job_id: str = "", private_code: str = "") -> LaunchT
     link = (link or "").strip()
     target = LaunchTarget(raw=link, job_id=(job_id or "").strip(), private_link_code=(private_code or "").strip())
     if not link:
-        raise ValueError("Escribe un PlaceId o pega el enlace del juego")
+        raise ValueError(t("Escribe un PlaceId o pega el enlace del juego"))
     if link.isdigit():
         target.place_id = int(link)
         return target
@@ -43,7 +44,7 @@ def parse_target(link: str, job_id: str = "", private_code: str = "") -> LaunchT
     elif query.get("placeid", "").isdigit():
         target.place_id = int(query["placeid"])
     else:
-        raise ValueError("No se encontró el PlaceId en el enlace")
+        raise ValueError(t("No se encontró el PlaceId en el enlace"))
 
     target.private_link_code = target.private_link_code or query.get("privateserverlinkcode", "")
     job = query.get("gameinstanceid") or query.get("jobid") or ""
@@ -122,13 +123,13 @@ class MultiInstanceMutex:
             try:
                 handle = win32event.CreateMutex(None, True, name)
                 if win32api.GetLastError() == winerror.ERROR_ALREADY_EXISTS:
-                    log.warning("El mutex %s ya existía: cierra Roblox y vuelve a abrir las instancias "
-                                "si no se abren varias a la vez", name)
+                    log.warning(t("El mutex %s ya existía: cierra Roblox y vuelve a abrir las instancias "
+                                "si no se abren varias a la vez"), name)
                 self._handles.append(handle)
             except Exception as exc:
                 log.debug("No se pudo crear %s: %s", name, exc)
         if self._handles:
-            log.info("Multi-instancia activa")
+            log.info(t("Multi-instancia activa"))
         return bool(self._handles)
 
     def release(self) -> None:
@@ -170,7 +171,7 @@ def apply_fps_cap(fps: int) -> int:
             path.write_text(json.dumps(data, indent=2), "utf-8")
             written += 1
         except Exception as exc:
-            log.warning("No se pudo escribir %s: %s", path, exc)
+            log.warning(t("No se pudo escribir %s: %s"), path, exc)
     return written
 
 

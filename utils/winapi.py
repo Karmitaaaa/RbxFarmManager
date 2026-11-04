@@ -305,6 +305,70 @@ def client_rect_on_screen(hwnd: int) -> tuple[int, int, int, int] | None:
         return None
 
 
+class BITMAPINFOHEADER(ctypes.Structure):
+    _fields_ = [("biSize", wintypes.DWORD), ("biWidth", wintypes.LONG), ("biHeight", wintypes.LONG),
+                ("biPlanes", wintypes.WORD), ("biBitCount", wintypes.WORD), ("biCompression", wintypes.DWORD),
+                ("biSizeImage", wintypes.DWORD), ("biXPelsPerMeter", wintypes.LONG),
+                ("biYPelsPerMeter", wintypes.LONG), ("biClrUsed", wintypes.DWORD),
+                ("biClrImportant", wintypes.DWORD)]
+
+
+gdi32 = ctypes.WinDLL("gdi32", use_last_error=True)
+user32.GetDC.argtypes = (wintypes.HWND,)
+user32.GetDC.restype = wintypes.HDC
+user32.ReleaseDC.argtypes = (wintypes.HWND, wintypes.HDC)
+user32.PrintWindow.argtypes = (wintypes.HWND, wintypes.HDC, wintypes.UINT)
+user32.PrintWindow.restype = wintypes.BOOL
+gdi32.CreateCompatibleDC.argtypes = (wintypes.HDC,)
+gdi32.CreateCompatibleDC.restype = wintypes.HDC
+gdi32.CreateDIBSection.argtypes = (wintypes.HDC, ctypes.POINTER(BITMAPINFOHEADER), wintypes.UINT,
+                                   ctypes.POINTER(ctypes.c_void_p), wintypes.HANDLE, wintypes.DWORD)
+gdi32.CreateDIBSection.restype = wintypes.HBITMAP
+gdi32.SelectObject.argtypes = (wintypes.HDC, wintypes.HGDIOBJ)
+gdi32.SelectObject.restype = wintypes.HGDIOBJ
+gdi32.DeleteObject.argtypes = (wintypes.HGDIOBJ,)
+gdi32.DeleteDC.argtypes = (wintypes.HDC,)
+
+PW_CLIENTONLY, PW_RENDERFULLCONTENT = 1, 2
+
+
+def capture_window(hwnd: int) -> tuple[bytes, int, int] | None:
+    """Copia el contenido de una ventana (píxeles BGRA de arriba abajo) con la API pública PrintWindow.
+
+    Funciona aunque esté tapada por otras ventanas, pero no si está minimizada: Windows no la dibuja.
+    Devuelve None si no se pudo capturar o si la imagen salió completamente negra.
+    """
+    try:
+        _, _, width, height = win32gui.GetClientRect(hwnd)
+    except Exception:
+        return None
+    if width <= 0 or height <= 0:
+        return None
+    header = BITMAPINFOHEADER(biSize=ctypes.sizeof(BITMAPINFOHEADER), biWidth=width, biHeight=-height,
+                              biPlanes=1, biBitCount=32)
+    bits = ctypes.c_void_p()
+    window_dc = user32.GetDC(hwnd)
+    if not window_dc:
+        return None
+    memory_dc = gdi32.CreateCompatibleDC(window_dc)
+    bitmap = gdi32.CreateDIBSection(memory_dc, ctypes.byref(header), 0, ctypes.byref(bits), None, 0)
+    data = None
+    try:
+        if bitmap:
+            previous = gdi32.SelectObject(memory_dc, bitmap)
+            if user32.PrintWindow(hwnd, memory_dc, PW_CLIENTONLY | PW_RENDERFULLCONTENT):
+                data = ctypes.string_at(bits, width * height * 4)
+            gdi32.SelectObject(memory_dc, previous)
+    finally:
+        if bitmap:
+            gdi32.DeleteObject(bitmap)
+        gdi32.DeleteDC(memory_dc)
+        user32.ReleaseDC(hwnd, window_dc)
+    if data is None or max(max(data[i::4092]) for i in range(3)) < 6:
+        return None
+    return data, width, height
+
+
 def post_key(hwnd: int, vk: int, hold: float = 0.06) -> None:
     """Envía una tecla por mensajes de ventana (sin robar foco). Roblox puede ignorarlo."""
     scan = user32.MapVirtualKeyW(vk, 0)

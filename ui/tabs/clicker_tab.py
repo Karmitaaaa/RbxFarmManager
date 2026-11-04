@@ -9,6 +9,7 @@ from ui import bind
 from ui.context import AppContext
 from ui.widgets import HotkeyEdit, Page, SectionHeader, make_card, muted_label, styled_button
 from utils import winapi
+from utils.i18n import t
 
 SETTING_KEYS = ("button", "interval_ms", "random_ms", "mode", "count", "position", "x", "y", "hold_ms")
 
@@ -33,85 +34,85 @@ class ClickerTab(Page):
             bind.spin(cfg, "clicker.interval_ms", 1, 600000, " ms"),
             bind.spin(cfg, "clicker.random_ms", 0, 10000, " ms"),
             bind.spin(cfg, "clicker.hold_ms", 0, 2000, " ms"),
-            bind.combo(cfg, "clicker.mode", {"toggle": "Alternar (pulsa para iniciar/parar)",
-                                             "hold": "Mantener (clica mientras mantienes la tecla)"}),
+            bind.combo(cfg, "clicker.mode", {"toggle": t("Alternar (pulsa para iniciar/parar)"),
+                                             "hold": t("Mantener (clica mientras mantienes la tecla)")}),
         ]
-        form.addRow("Botón", self.widgets[0])
-        form.addRow("Intervalo", self.widgets[1])
-        form.addRow("Variación aleatoria ±", self.widgets[2])
-        form.addRow("Duración de cada click", self.widgets[3])
-        form.addRow("Modo de la hotkey", self.widgets[4])
+        form.addRow(t("Botón"), self.widgets[0])
+        form.addRow(t("Intervalo"), self.widgets[1])
+        form.addRow(t("Variación aleatoria ±"), self.widgets[2])
+        form.addRow(t("Duración de cada click"), self.widgets[3])
+        form.addRow(t("Modo de la hotkey"), self.widgets[4])
 
         count_row = QHBoxLayout()
-        self.count = bind.spin(cfg, "clicker.count", 0, 10_000_000, " clicks")
-        self.count.setSpecialValueText("Infinito")
-        self.infinite = QCheckBox("Infinito")
+        self.count = bind.spin(cfg, "clicker.count", 0, 10_000_000, t(" clicks"))
+        self.count.setSpecialValueText(t("Infinito"))
+        self.infinite = QCheckBox(t("Infinito"))
         self.infinite.setChecked(self.count.value() == 0)
         self.infinite.toggled.connect(lambda on: self.count.setValue(0 if on else max(100, self.count.value())))
         self.count.valueChanged.connect(lambda v: self.infinite.setChecked(v == 0))
         count_row.addWidget(self.count)
         count_row.addWidget(self.infinite)
         count_row.addStretch(1)
-        form.addRow("Cantidad", count_row)
+        form.addRow(t("Cantidad"), count_row)
         self.widgets.append(self.count)
 
-        self.position = bind.combo(cfg, "clicker.position", {"cursor": "Donde esté el cursor",
-                                                             "fixed": "Posición fija"})
-        form.addRow("Posición", self.position)
+        self.position = bind.combo(cfg, "clicker.position", {"cursor": t("Donde esté el cursor"),
+                                                             "fixed": t("Posición fija")})
+        form.addRow(t("Posición"), self.position)
         xy = QHBoxLayout()
         self.x = bind.spin(cfg, "clicker.x", -10000, 20000)
         self.y = bind.spin(cfg, "clicker.y", -10000, 20000)
         self.x.setPrefix("X ")
         self.y.setPrefix("Y ")
-        self.capture_btn = styled_button("Capturar (3 s)", "", self.start_capture)
+        self.capture_btn = styled_button(t("Capturar (3 s)"), "", self.start_capture)
         xy.addWidget(self.x)
         xy.addWidget(self.y)
         xy.addWidget(self.capture_btn)
         xy.addStretch(1)
-        form.addRow("Coordenadas", xy)
+        form.addRow(t("Coordenadas"), xy)
         self.widgets += [self.position, self.x, self.y]
 
         self.target = QComboBox()
-        form.addRow("Ventana destino", self.target)
+        form.addRow(t("Ventana destino"), self.target)
         lay.addLayout(form)
-        lay.addWidget(muted_label("Con una ventana destino, la app la enfoca antes de empezar y las "
-                                  "coordenadas fijas se toman relativas a su área de juego."))
+        lay.addWidget(muted_label(t("Con una ventana destino, la app la enfoca antes de empezar y las "
+                                  "coordenadas fijas se toman relativas a su área de juego.")))
         left.addWidget(card)
 
-        left.addWidget(SectionHeader("Presets (asignables a cuentas)"))
+        left.addWidget(SectionHeader(t("Presets (asignables a cuentas)")))
         card, lay = make_card(16, 8)
         row = QHBoxLayout()
         self.presets = QComboBox()
         self.presets.setMinimumWidth(200)
         row.addWidget(self.presets, 1)
-        row.addWidget(styled_button("Cargar", "", self.load_preset))
-        row.addWidget(styled_button("Guardar como…", "secondary", self.save_preset))
-        row.addWidget(styled_button("Eliminar", "", self.delete_preset))
+        row.addWidget(styled_button(t("Cargar"), "", self.load_preset))
+        row.addWidget(styled_button(t("Guardar como…"), "secondary", self.save_preset))
+        row.addWidget(styled_button(t("Eliminar"), "", self.delete_preset))
         lay.addLayout(row)
         left.addWidget(card)
         left.addStretch(1)
 
         # ---------------- control
         right = QVBoxLayout()
-        right.addWidget(SectionHeader("Control"))
+        right.addWidget(SectionHeader(t("Control")))
         card, lay = make_card(20, 12)
-        self.state = QLabel("Detenido")
+        self.state = QLabel(t("Detenido"))
         self.state.setObjectName("BigCounter")
         self.state.setAlignment(Qt.AlignCenter)
-        self.clicks = muted_label("0 clicks")
+        self.clicks = muted_label(t("0 clicks"))
         self.clicks.setAlignment(Qt.AlignCenter)
         lay.addWidget(self.state)
         lay.addWidget(self.clicks)
-        self.toggle_btn = styled_button("Iniciar", "primary", self.toggle, big=True)
+        self.toggle_btn = styled_button(t("Iniciar"), "primary", self.toggle, big=True)
         lay.addWidget(self.toggle_btn)
         hk = QHBoxLayout()
-        hk.addWidget(QLabel("Hotkey global"))
+        hk.addWidget(QLabel(t("Hotkey global")))
         self.hotkey = HotkeyEdit(cfg.get("hotkeys.clicker", "F6"))
         self.hotkey.hotkey_changed.connect(self.set_hotkey)
         hk.addWidget(self.hotkey)
         hk.addStretch(1)
         lay.addLayout(hk)
-        lay.addWidget(muted_label("La hotkey funciona aunque la app esté minimizada o en la bandeja."))
+        lay.addWidget(muted_label(t("La hotkey funciona aunque la app esté minimizada o en la bandeja.")))
         right.addWidget(card)
         right.addStretch(1)
 
@@ -144,9 +145,9 @@ class ClickerTab(Page):
         self.ctx.clicker.start(settings, inst.hwnd if inst else None)
 
     def _state_changed(self, running: bool) -> None:
-        self.state.setText("En marcha" if running else "Detenido")
+        self.state.setText(t("En marcha") if running else t("Detenido"))
         self.state.setStyleSheet(f"color: {'#02B757' if running else ''};")
-        self.toggle_btn.setText("Detener" if running else "Iniciar")
+        self.toggle_btn.setText(t("Detener") if running else t("Iniciar"))
         self.toggle_btn.setObjectName("DangerButton" if running else "PrimaryButton")
         self.toggle_btn.style().unpolish(self.toggle_btn)
         self.toggle_btn.style().polish(self.toggle_btn)
@@ -157,7 +158,7 @@ class ClickerTab(Page):
 
     def refresh_targets(self) -> None:
         current = self.target.currentData()
-        items = [("", "Pantalla completa (sin ventana)")]
+        items = [("", t("Pantalla completa (sin ventana)"))]
         items += [(i.id, f"{i.account.alias} (PID {i.pid})") for i in self.ctx.manager.snapshot()
                   if i.status in (ST_OPEN, ST_INGAME) and i.hwnd]
         if [self.target.itemData(k) for k in range(self.target.count())] == [k for k, _ in items]:
@@ -177,7 +178,7 @@ class ClickerTab(Page):
 
     def _tick(self) -> None:
         if self._countdown > 0:
-            self.capture_btn.setText(f"Mueve el ratón… {self._countdown}")
+            self.capture_btn.setText(t("Mueve el ratón… {0}", self._countdown))
             self._countdown -= 1
             QTimer.singleShot(1000, self._tick)
             return
@@ -189,7 +190,7 @@ class ClickerTab(Page):
         self.x.setValue(x)
         self.y.setValue(y)
         self.position.setCurrentIndex(self.position.findData("fixed"))
-        self.capture_btn.setText("Capturar (3 s)")
+        self.capture_btn.setText(t("Capturar (3 s)"))
         self.capture_btn.setEnabled(True)
 
     # ------------------------------------------------------------------ presets
@@ -202,7 +203,7 @@ class ClickerTab(Page):
             self.presets.setCurrentIndex(idx)
 
     def save_preset(self) -> None:
-        name, ok = QInputDialog.getText(self, "Guardar preset", "Nombre del preset:",
+        name, ok = QInputDialog.getText(self, t("Guardar preset"), t("Nombre del preset:"),
                                         text=self.presets.currentText())
         name = name.strip()
         if not ok or not name:
@@ -224,7 +225,7 @@ class ClickerTab(Page):
 
     def delete_preset(self) -> None:
         name = self.presets.currentText()
-        if not name or QMessageBox.question(self, "Eliminar preset", f"¿Eliminar «{name}»?") != QMessageBox.Yes:
+        if not name or QMessageBox.question(self, t("Eliminar preset"), t("¿Eliminar «{0}»?", name)) != QMessageBox.Yes:
             return
         presets = dict(self.ctx.cfg.get("clicker_presets", {}))
         presets.pop(name, None)

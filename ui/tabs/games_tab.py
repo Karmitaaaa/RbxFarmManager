@@ -10,6 +10,7 @@ from ui.context import AppContext
 from ui.game_dialog import GameProfileDialog
 from ui.icons import G
 from ui.widgets import AddCard, EmptyState, FlowLayout, GameCard, Page, clear_layout
+from utils.i18n import t
 
 log = logging.getLogger("juegos")
 
@@ -18,9 +19,9 @@ def game_subtitle(ctx: AppContext, game) -> str:
     n = sum(1 for i in game.account_ids if ctx.vault.get(i))
     parts = [f"{n} cuenta{'s' if n != 1 else ''}"]
     if game.macro_profile:
-        parts.append(f"macro «{game.macro_profile}»")
+        parts.append(t("macro «{0}»", game.macro_profile))
     elif game.clicker_preset:
-        parts.append(f"clicker «{game.clicker_preset}»")
+        parts.append(t("clicker «{0}»", game.clicker_preset))
     if game.private_code or "privateServerLinkCode" in game.link or "/share" in game.link:
         parts.append("privado")
     return " · ".join(parts)
@@ -36,7 +37,7 @@ class GameActions:
         dlg = GameProfileDialog(self.ctx, None, self.parent, preset_link=link, preset_accounts=accounts)
         if dlg.exec():
             self.ctx.games.upsert(dlg.game)
-            log.info("Perfil de juego creado: %s", dlg.game.name)
+            log.info(t("Perfil de juego creado: %s"), dlg.game.name)
             self.ctx.games_changed.emit()
 
     def edit(self, game_id: str) -> None:
@@ -51,8 +52,9 @@ class GameActions:
     def play(self, game_id: str) -> None:
         error = self.ctx.launch_game(game_id)
         if error:
-            QMessageBox.information(self.parent, "Jugar", error)
-            if "no tiene cuentas" in error:
+            QMessageBox.information(self.parent, t("Jugar"), error)
+            game = self.ctx.games.get(game_id)
+            if game and not any(self.ctx.vault.get(i) for i in game.account_ids):
                 self.edit(game_id)
             return
         self.ctx.navigate.emit("instances")
@@ -62,13 +64,13 @@ class GameActions:
         if not game:
             return
         m = QMenu(self.parent)
-        m.addAction("Jugar", lambda: self.play(game_id))
-        m.addAction("Editar perfil…", lambda: self.edit(game_id))
-        m.addAction("Ver sus macros", lambda: self.ctx.navigate.emit(f"macros:{game_id}"))
-        m.addAction("Duplicar", lambda: (self.ctx.games.duplicate(game_id), self.ctx.games_changed.emit()))
+        m.addAction(t("Jugar"), lambda: self.play(game_id))
+        m.addAction(t("Editar perfil…"), lambda: self.edit(game_id))
+        m.addAction(t("Ver sus macros"), lambda: self.ctx.navigate.emit(f"macros:{game_id}"))
+        m.addAction(t("Duplicar"), lambda: (self.ctx.games.duplicate(game_id), self.ctx.games_changed.emit()))
         m.addSeparator()
-        m.addAction("Cerrar sus instancias", lambda: self.close_instances(game_id))
-        m.addAction("Eliminar perfil", lambda: self.delete(game_id))
+        m.addAction(t("Cerrar sus instancias"), lambda: self.close_instances(game_id))
+        m.addAction(t("Eliminar perfil"), lambda: self.delete(game_id))
         m.exec(QCursor.pos())
 
     def close_instances(self, game_id: str) -> None:
@@ -78,8 +80,8 @@ class GameActions:
 
     def delete(self, game_id: str) -> None:
         game = self.ctx.games.get(game_id)
-        if game and QMessageBox.question(self.parent, "Eliminar perfil",
-                                         f"¿Eliminar el perfil «{game.name}»?\nLas cuentas y macros no se borran."
+        if game and QMessageBox.question(self.parent, t("Eliminar perfil"),
+                                         t("¿Eliminar el perfil «{0}»?\nLas cuentas y macros no se borran.", game.name)
                                          ) == QMessageBox.Yes:
             self.ctx.games.delete(game_id)
             self.ctx.games_changed.emit()
@@ -111,10 +113,10 @@ class GamesTab(Page):
         self.actions = GameActions(ctx, self)
         self.cards: dict[str, GameCard] = {}
 
-        self.empty = EmptyState(G.GAME, "Aún no tienes perfiles de juego",
-                                "Un perfil guarda el juego (o servidor privado), qué cuentas entran y qué macro "
-                                "usan. Después basta con pulsar «Jugar».",
-                                "Crear mi primer perfil", self.actions.new, G.ADD)
+        self.empty = EmptyState(G.GAME, t("Aún no tienes perfiles de juego"),
+                                t("Un perfil guarda el juego (o servidor privado), qué cuentas entran y qué macro "
+                                "usan. Después basta con pulsar «Jugar»."),
+                                t("Crear mi primer perfil"), self.actions.new, G.ADD)
         self.body.addWidget(self.empty)
         self.grid_host = QWidget()
         self.grid = FlowLayout(16)
@@ -137,7 +139,7 @@ class GamesTab(Page):
             self.grid.addWidget(card)
             self.cards[game.id] = card
         if games:
-            add = AddCard("Nuevo perfil de juego", 200, self.cards[games[0].id].sizeHint().height())
+            add = AddCard(t("Nuevo perfil de juego"), 200, self.cards[games[0].id].sizeHint().height())
             add.clicked.connect(self.actions.new)
             self.grid.addWidget(add)
         self.empty.setVisible(not games)

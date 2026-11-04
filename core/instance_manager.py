@@ -21,6 +21,7 @@ from core.models import (ACTIVE_STATES, LOGIN_COOKIE, ST_CLOSED, ST_DISCONNECTED
 from core.reconnect import backoff_delay, classify_log_line, internet_ok
 from storage.config import Config
 from utils import winapi
+from utils.i18n import t
 
 log = logging.getLogger("instancias")
 
@@ -74,14 +75,14 @@ class InstanceManager(QObject):
                 running = [i for i in self._instances.values()
                            if i.account.id == acc.id and i.status not in (ST_STOPPED, ST_FAILED, ST_CLOSED)]
                 if running:
-                    self._emit("warning", f"{acc.alias}: ya tiene una instancia activa, se omite")
+                    self._emit("warning", t("{0}: ya tiene una instancia activa, se omite", acc.alias))
                     continue
                 inst = Instance(account=acc, target=target,
                                 anti_afk=profile.anti_afk if profile else acc.anti_afk,
                                 auto_reconnect=profile.auto_reconnect if profile else True)
                 if profile:
                     inst.profile_id, inst.profile_name = profile.id, profile.name
-                inst.detail = "En cola"
+                inst.detail = t("En cola")
                 self._instances[inst.id] = inst
                 self._queue.put(inst.id)
         self.changed.emit()
@@ -92,8 +93,8 @@ class InstanceManager(QObject):
             return
         inst.user_closed = True
         self._kill(inst)
-        inst.status, inst.detail = ST_STOPPED, "Cerrada por el usuario"
-        log.info("%s: instancia cerrada por el usuario", inst.account.alias)
+        inst.status, inst.detail = ST_STOPPED, t("Cerrada por el usuario")
+        log.info(t("%s: instancia cerrada por el usuario"), inst.account.alias)
         self.changed.emit()
 
     def restart(self, inst_id: str) -> None:
@@ -102,8 +103,8 @@ class InstanceManager(QObject):
             return
         self._kill(inst)
         self._reset_for_launch(inst)
-        inst.detail = "Reinicio manual"
-        log.info("%s: reinicio manual", inst.account.alias)
+        inst.detail = t("Reinicio manual")
+        log.info(t("%s: reinicio manual"), inst.account.alias)
         self._queue.put(inst.id)
         self.changed.emit()
 
@@ -124,6 +125,12 @@ class InstanceManager(QObject):
         for inst in self.snapshot():
             if inst.hwnd and winapi.is_window(inst.hwnd):
                 winapi.minimize(inst.hwnd)
+
+    def minimize(self, inst_id: str) -> None:
+        inst = self.get(inst_id)
+        if inst and winapi.is_window(inst.hwnd):
+            winapi.minimize(inst.hwnd)
+            self.changed.emit()
 
     def focus(self, inst_id: str) -> bool:
         inst = self.get(inst_id)
@@ -183,17 +190,17 @@ class InstanceManager(QObject):
                 continue
             wait = float(self.cfg.get("launch.delay_s", 8)) - (time.time() - last_launch)
             if wait > 0:
-                inst.detail = f"Esperando {wait:.0f} s para lanzar"
+                inst.detail = t("Esperando {0:.0f} s para lanzar", wait)
                 self.changed.emit()
                 self._stop.wait(wait)
             try:
                 self._launch_one(inst)
             except roblox_api.RobloxAuthError as exc:
                 inst.status, inst.detail = ST_FAILED, str(exc)
-                self._emit("error", f"{inst.account.alias}: {exc}. Actualiza la cookie en Cuentas.")
+                self._emit("error", t("{0}: {1}. Actualiza la cookie en Cuentas.", inst.account.alias, exc))
             except Exception as exc:
                 log.exception("Fallo al lanzar %s", inst.account.alias)
-                self._handle_failure(inst, f"Error al lanzar: {exc}")
+                self._handle_failure(inst, t("Error al lanzar: {0}", exc))
             last_launch = time.time()
             self.changed.emit()
 
@@ -206,24 +213,24 @@ class InstanceManager(QObject):
         if fps:
             launcher.apply_fps_cap(fps)
 
-        inst.detail = "Preparando inicio de sesión"
+        inst.detail = t("Preparando inicio de sesión")
         self.changed.emit()
         if acc.login_method == LOGIN_COOKIE:
             if not acc.cookie:
-                raise roblox_api.RobloxAuthError("La cuenta no tiene cookie guardada")
+                raise roblox_api.RobloxAuthError(t("La cuenta no tiene cookie guardada"))
             if target.share_code and not target.private_link_code:
                 target.place_id, target.private_link_code = roblox_api.resolve_share_link(acc.cookie, target.share_code)
             uri = launcher.build_player_uri(roblox_api.get_auth_ticket(acc.cookie), target)
         else:
             if target.share_code:
-                raise ValueError("Los enlaces 'share' necesitan una cuenta con cookie para resolverse")
+                raise ValueError(t("Los enlaces 'share' necesitan una cuenta con cookie para resolverse"))
             uri = launcher.build_deeplink(target)
 
         before = launcher.roblox_pids()
-        inst.detail = "Abriendo Roblox"
+        inst.detail = t("Abriendo Roblox")
         self.changed.emit()
         launcher.open_uri(uri)
-        log.info("%s: lanzando %s", acc.alias, target.label)
+        log.info(t("%s: lanzando %s"), acc.alias, target.label)
 
         deadline = time.time() + float(self.cfg.get("launch.pid_timeout_s", 60))
         while time.time() < deadline and not self._stop.is_set():
@@ -243,15 +250,15 @@ class InstanceManager(QObject):
                     break
             time.sleep(0.5)
         if not inst.pid:
-            raise RuntimeError("Roblox no se abrió a tiempo")
+            raise RuntimeError(t("Roblox no se abrió a tiempo"))
 
         if self.cfg.get("launch.low_priority"):
             try:
                 self._procs[inst.pid].nice(psutil.BELOW_NORMAL_PRIORITY_CLASS)
             except psutil.Error:
                 pass
-        inst.status, inst.detail = ST_OPEN, "Cargando"
-        log.info("%s: proceso %s abierto", acc.alias, inst.pid)
+        inst.status, inst.detail = ST_OPEN, t("Cargando")
+        log.info(t("%s: proceso %s abierto"), acc.alias, inst.pid)
 
     # ------------------------------------------------------------------ hilo monitor
     def _monitor_loop(self) -> None:
@@ -275,9 +282,9 @@ class InstanceManager(QObject):
         was = self.online
         self.online = internet_ok()
         if was and not self.online:
-            self._emit("warning", "Se perdió la conexión a internet")
+            self._emit("warning", t("Se perdió la conexión a internet"))
         elif not was and self.online:
-            self._emit("info", "Conexión a internet recuperada")
+            self._emit("info", t("Conexión a internet recuperada"))
 
     def _check_instance(self, inst: Instance) -> None:
         now = time.time()
@@ -287,15 +294,15 @@ class InstanceManager(QObject):
             return
         if inst.status in (ST_WAIT_RECONNECT, ST_WAIT_NET):
             if not self.online:
-                inst.status, inst.detail = ST_WAIT_NET, "Esperando a que vuelva internet"
+                inst.status, inst.detail = ST_WAIT_NET, t("Esperando a que vuelva internet")
                 return
             if now >= inst.next_retry_at:
                 self._reset_for_launch(inst)
-                inst.detail = f"Reconectando (intento {inst.retries}/{rc['max_attempts']})"
+                inst.detail = t("Reconectando (intento {0}/{1})", inst.retries, rc['max_attempts'])
                 self._queue.put(inst.id)
             else:
                 inst.status = ST_WAIT_RECONNECT
-                inst.detail = f"Intento {inst.retries}/{rc['max_attempts']} en {inst.next_retry_at - now:.0f} s"
+                inst.detail = t("Intento {0}/{1} en {2:.0f} s", inst.retries, rc['max_attempts'], inst.next_retry_at - now)
             return
         if inst.pid is None:
             return  # aún lo está lanzando el otro hilo
@@ -308,7 +315,7 @@ class InstanceManager(QObject):
         if not alive:
             self._procs.pop(inst.pid, None)
             if not inst.user_closed:
-                self._handle_failure(inst, "El proceso de Roblox se cerró")
+                self._handle_failure(inst, t("El proceso de Roblox se cerró"))
             return
         try:
             inst.cpu = proc.cpu_percent(None) / psutil.cpu_count()
@@ -328,8 +335,8 @@ class InstanceManager(QObject):
         # Diálogos nativos de error/crash
         dialogs = winapi.error_dialogs_for_pid(inst.pid)
         if dialogs:
-            title = dialogs[0]["title"] or "sin título"
-            self._handle_failure(inst, f"Diálogo de error: «{title}»")
+            title = dialogs[0]["title"] or t("sin título")
+            self._handle_failure(inst, t("Diálogo de error: «{0}»", title))
             return
 
         # Log del cliente (archivo de texto) para saber si está en juego o desconectado
@@ -339,14 +346,14 @@ class InstanceManager(QObject):
         if inst.last_disconnect_at and inst.last_disconnect_at > inst.joined_at:
             waited = now - inst.last_disconnect_at
             if waited >= grace:
-                self._handle_failure(inst, "Desconectado del servidor")
+                self._handle_failure(inst, t("Desconectado del servidor"), disconnected=True)
                 return
-            inst.detail = f"Posible desconexión ({grace - waited:.0f} s)"
+            inst.detail = t("Posible desconexión ({0:.0f} s)", grace - waited)
 
         if inst.joined_at and inst.joined_at >= inst.last_disconnect_at:
             if inst.status != ST_INGAME:
                 inst.status, inst.detail = ST_INGAME, ""
-                log.info("%s: en juego (%s)", inst.account.alias, inst.target.label)
+                log.info(t("%s: en juego (%s)"), inst.account.alias, inst.target.label)
                 self.joined.emit(inst.id)
             if inst.retries and now - inst.joined_at > float(rc.get("reset_after_s", 300)):
                 inst.retries = 0
@@ -356,7 +363,7 @@ class InstanceManager(QObject):
         timeout = float(rc.get("join_timeout_s", 180))
         if (inst.log_path and inst.status != ST_INGAME and not inst.joined_at
                 and rc.get("restart_on_join_timeout") and now - inst.started_at > timeout):
-            self._handle_failure(inst, f"No entró al juego en {timeout:.0f} s")
+            self._handle_failure(inst, t("No entró al juego en {0:.0f} s", timeout))
 
     def _read_client_log(self, inst: Instance, now: float) -> None:
         if not inst.log_path:
@@ -382,30 +389,30 @@ class InstanceManager(QObject):
             elif kind == "disconnect":
                 inst.last_disconnect_at = stamp
             elif kind == "joining" and inst.status == ST_INGAME:
-                inst.detail = "Teletransportando"
+                inst.detail = t("Teletransportando")
 
     # ------------------------------------------------------------------ reconexión
-    def _handle_failure(self, inst: Instance, reason: str) -> None:
+    def _handle_failure(self, inst: Instance, reason: str, disconnected: bool = False) -> None:
         rc = self.cfg.section("reconnect")
         self._kill(inst)
         inst.pid = inst.hwnd = None
         self._emit("warning", f"{inst.account.alias}: {reason}")
 
         if not (rc.get("enabled") and inst.auto_reconnect):
-            inst.status = ST_DISCONNECTED if "Desconect" in reason else ST_ERROR
+            inst.status = ST_DISCONNECTED if disconnected else ST_ERROR
             inst.detail = reason
             return
         if not self.online:
-            inst.status, inst.detail = ST_WAIT_NET, "Esperando a que vuelva internet"
+            inst.status, inst.detail = ST_WAIT_NET, t("Esperando a que vuelva internet")
             inst.next_retry_at = time.time()
             return
         if inst.retries >= int(rc.get("max_attempts", 5)):
-            inst.status, inst.detail = ST_FAILED, f"Sin éxito tras {inst.retries} intentos: {reason}"
-            self._emit("error", f"{inst.account.alias}: se agotaron los intentos de reconexión")
+            inst.status, inst.detail = ST_FAILED, t("Sin éxito tras {0} intentos: {1}", inst.retries, reason)
+            self._emit("error", t("{0}: se agotaron los intentos de reconexión", inst.account.alias))
             return
         delay = backoff_delay(inst.retries, float(rc.get("base_delay_s", 10)), float(rc.get("max_delay_s", 300)))
         inst.retries += 1
         inst.next_retry_at = time.time() + delay
         inst.status = ST_WAIT_RECONNECT
-        inst.detail = f"Intento {inst.retries}/{rc['max_attempts']} en {delay:.0f} s"
-        log.info("%s: reconexión programada en %.0f s (intento %d)", inst.account.alias, delay, inst.retries)
+        inst.detail = t("Intento {0}/{1} en {2:.0f} s", inst.retries, rc['max_attempts'], delay)
+        log.info(t("%s: reconexión programada en %.0f s (intento %d)"), inst.account.alias, delay, inst.retries)

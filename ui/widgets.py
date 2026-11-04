@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QLayout, QLineEdit, 
 
 from ui import theme
 from ui.icons import G, glyph_icon, icon_font
+from utils.i18n import t
 
 current_theme = {"name": "classic"}
 
@@ -319,16 +320,16 @@ class FlowLayout(QLayout):
 
 def time_ago(stamp: float) -> str:
     if not stamp:
-        return "Aún sin jugar"
+        return t("Aún sin jugar")
     secs = max(0, time.time() - stamp)
     if secs < 90:
-        return "Jugado hace un momento"
+        return t("Jugado hace un momento")
     if secs < 3600:
-        return f"Jugado hace {secs / 60:.0f} min"
+        return t("Jugado hace {0:.0f} min", secs / 60)
     if secs < 86400:
-        return f"Jugado hace {secs / 3600:.0f} h"
+        return t("Jugado hace {0:.0f} h", secs / 3600)
     days = secs / 86400
-    return f"Jugado hace {days:.0f} día{'s' if days >= 1.5 else ''}"
+    return t("Jugado hace {0:.0f} día{1}", days, 's' if days >= 1.5 else '')
 
 
 class GameCover(QWidget):
@@ -384,7 +385,7 @@ class GameCard(QFrame):
         self.setFixedWidth(width)
         self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.setCursor(Qt.PointingHandCursor)
-        self.setToolTip("Doble clic para editar el perfil")
+        self.setToolTip(t("Doble clic para editar el perfil"))
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 10)
         lay.setSpacing(4)
@@ -413,11 +414,11 @@ class GameCard(QFrame):
         buttons = QHBoxLayout()
         buttons.setContentsMargins(10, 4, 10, 0)
         buttons.setSpacing(6)
-        play = styled_button("Jugar", "primary", lambda: self.play_clicked.emit(self.game_id), icon=G.PLAY)
+        play = styled_button(t("Jugar"), "primary", lambda: self.play_clicked.emit(self.game_id), icon=G.PLAY)
         buttons.addWidget(play, 1)
         more = styled_button("", "", lambda: self.menu_clicked.emit(self.game_id), icon=G.MORE)
         more.setFixedWidth(34)
-        more.setToolTip("Más opciones")
+        more.setToolTip(t("Más opciones"))
         buttons.addWidget(more)
         lay.addLayout(buttons)
         self.last_played = game.last_played
@@ -428,7 +429,7 @@ class GameCard(QFrame):
 
     def set_status(self, in_game: int, active: int) -> None:
         if active:
-            self.status.setText(f"● {in_game} en juego · {active} abiertas")
+            self.status.setText(t("● {0} en juego · {1} abiertas", in_game, active))
             self.status.setStyleSheet(f"font-size: 9pt; font-weight: 600; color: {theme.ACCENTS['green']};")
         else:
             self.status.setText(time_ago(self.last_played))
@@ -539,7 +540,7 @@ class StatusPill(QLabel):
 
     def set_status(self, status: str) -> None:
         color = theme.STATUS_COLORS.get(status, theme.ACCENTS["gray"])
-        self.setText(status)
+        self.setText(t(status))
         self.setStyleSheet(f"background:{color}; color:#FFFFFF; border-radius:9px; padding:1px 10px;"
                            f"font-weight:700; font-size:9pt;")
 
@@ -574,8 +575,8 @@ class HotkeyEdit(QLineEdit):
     def __init__(self, value: str = ""):
         super().__init__(value)
         self.setReadOnly(True)
-        self.setPlaceholderText("Pulsa una tecla…")
-        self.setToolTip("Haz clic y pulsa la combinación (p. ej. F6 o Ctrl+F7). Retroceso para borrar.")
+        self.setPlaceholderText(t("Pulsa una tecla…"))
+        self.setToolTip(t("Haz clic y pulsa la combinación (p. ej. F6 o Ctrl+F7). Retroceso para borrar."))
         self.setMaximumWidth(150)
 
     def keyPressEvent(self, event):
@@ -654,8 +655,8 @@ class NotificationsDock(QWidget):
 
     def _refresh_header(self) -> None:
         arrow = "▾" if self.expanded else "▴"
-        badge = f"   ({self.unread} nuevas)" if self.unread else ""
-        self.header.setText(f"Notificaciones{badge}   {arrow}")
+        badge = t("   ({0} nuevas)", self.unread) if self.unread else ""
+        self.header.setText(t("Notificaciones{0}   {1}", badge, arrow))
 
     def _reposition(self) -> None:
         parent = self.parentWidget()

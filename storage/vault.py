@@ -8,6 +8,7 @@ from pathlib import Path
 from core.models import Account
 from storage import crypto
 from utils.paths import vault_path
+from utils.i18n import t
 
 log = logging.getLogger(__name__)
 
@@ -48,7 +49,7 @@ class Vault:
             self.accounts = []
             self.unlocked = True
             self.save()
-        log.info("Baúl de cuentas creado (modo %s)", mode)
+        log.info(t("Baúl de cuentas creado (modo %s)"), mode)
 
     def unlock(self, password: str | None = None) -> None:
         with self._lock:
@@ -59,7 +60,7 @@ class Vault:
             self._password = password if self.mode == "password" else None
             self.accounts = [Account.from_dict(a) for a in data.get("accounts", [])]
             self.unlocked = True
-        log.info("Baúl desbloqueado: %d cuentas", len(self.accounts))
+        log.info(t("Baúl desbloqueado: %d cuentas"), len(self.accounts))
 
     def lock(self) -> None:
         with self._lock:
@@ -71,7 +72,7 @@ class Vault:
         with self._lock:
             self.mode, self._password = mode, password
             self.save()
-        log.info("Protección del baúl cambiada a %s", mode)
+        log.info(t("Protección del baúl cambiada a %s"), mode)
 
     # ------------------------------------------------------------------ CRUD
     def save(self) -> None:
@@ -106,7 +107,7 @@ class Vault:
             payload = json.dumps({"accounts": [a.to_dict() for a in chosen]}).encode("utf-8")
         # Las exportaciones siempre usan contraseña para poder llevarlas a otro equipo
         Path(path).write_bytes(crypto.seal(payload, "password", password))
-        log.info("Exportadas %d cuentas cifradas a %s", len(chosen), path)
+        log.info(t("Exportadas %d cuentas cifradas a %s"), len(chosen), path)
         return len(chosen)
 
     def import_from(self, path: str, password: str) -> tuple[int, int]:
@@ -123,5 +124,5 @@ class Vault:
                     self.accounts.append(acc)
                     added += 1
             self.save()
-        log.info("Importadas %d cuentas nuevas, %d actualizadas", added, updated)
+        log.info(t("Importadas %d cuentas nuevas, %d actualizadas"), added, updated)
         return added, updated

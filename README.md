@@ -4,7 +4,8 @@ A Windows desktop app that organizes Roblox farming: encrypted accounts, several
 anti-AFK, auto-reconnect, an autoclicker and macros organized per game. The interface is inspired by the
 classic Roblox website (blue top bar, grey background, white cards, round avatars) and has a dark theme.
 
-> **Note:** the app's interface is currently in Spanish.
+The interface is available in **English and Spanish**: it follows your Windows language and you can change it in
+**Log → Settings → Language**.
 
 > RbxFarm Manager only uses external automation (Windows windows, keyboard and mouse). It does not inject
 > code and never reads or modifies the Roblox client's memory. Even so, automation and alternate accounts
@@ -40,9 +41,12 @@ To uninstall, use Windows «Add or remove programs» (your data in `%APPDATA%\Rb
   preset they use, then press **Play**. The real game name and icon are fetched from Roblox.
 - **Multi-instance:** several Roblox clients at once, with status (launching, open, in game, reconnecting…),
   CPU/RAM, FPS cap, low CPU priority and auto-minimize.
+- **Live window previews:** each instance is a card with a picture of its window; click it to bring the
+  window to the front. You can switch to the compact table view or turn previews off.
 - **Anti-AFK** with randomized intervals, **auto-reconnect** with exponential back-off (detects crashes,
   error dialogs, server disconnections and internet loss), **autoclicker** and **macro recorder/player**
   with global hotkeys.
+- **Languages:** English and Spanish, and a new language is just one more JSON file.
 - Greeting with your main account's name and avatar, first-steps guide, tray icon and notifications.
 
 ---
@@ -101,7 +105,8 @@ RbxFarmManager/
 ├─ VERSION                  App version (bundled into the .exe, used by the updater and installers)
 ├─ build.bat                Builds the app (PyInstaller) and the installers (Inno Setup)
 ├─ installer/               RbxFarmManager.iss (full installer) and RbxFarmManager-WebSetup.iss
-├─ tools/make_icon.py       Generates assets/icon.ico
+├─ locales/                 Translations (en.json); the source text in the code is Spanish
+├─ tools/                   make_icon.py (assets/icon.ico), check_i18n.py (checks translations)
 ├─ core/                    Logic (no UI)
 │  ├─ models.py             Account, Instance, GameProfile, LaunchTarget and states
 │  ├─ roblox_api.py         Auth ticket, session check, share links, game info, avatars and icons
@@ -109,6 +114,7 @@ RbxFarmManager/
 │  ├─ instance_manager.py   Launch queue + status monitor + auto-reconnect
 │  ├─ reconnect.py          Back-off, disconnection detection, internet check
 │  ├─ updater.py            GitHub Releases update check, download and install
+│  ├─ previews.py           Captures the window previews in the background
 │  ├─ anti_afk.py           Anti-AFK
 │  ├─ autoclicker.py        Autoclicker
 │  ├─ macro.py              Macro recorder and player
@@ -128,6 +134,7 @@ RbxFarmManager/
 │  ├─ roblox_login.py       Sign in with the official Roblox page (embedded browser)
 │  ├─ game_dialog.py        Game profile editor
 │  ├─ updates.py            Update banner and update dialog
+│  ├─ instance_card.py      Instance card with its window preview
 │  ├─ main_window.py        Top bar, sidebar, tray, hotkeys
 │  └─ tabs/                 Home, Games, Instances, Anti-AFK, Autoclicker, Macros, Log
 └─ utils/
@@ -135,11 +142,18 @@ RbxFarmManager/
    ├─ hotkeys.py            Global hotkeys (pynput)
    ├─ logger.py             Rotating file log; hides cookies and tickets
    ├─ version.py            App version and version comparison
+   ├─ i18n.py               Languages: t(), N_() and language loading
    └─ paths.py              Data paths
 ```
 
 Data lives in `%APPDATA%\RbxFarmManager`: `vault.dat` (encrypted accounts), `games.json`,
 `settings.json`, `macros\*.json`, `avatars\` and `logs\rbxfarm.log`.
+
+### Adding a language
+
+Copy `locales/en.json` to `locales/<code>.json` (for example `pt.json`), set its name in `@language` and
+translate the values. Keep placeholders such as `{0}` and `%s`. The language appears in Settings by itself.
+New texts in the code go through `t("…")`; run `python tools/check_i18n.py` to find anything missing.
 
 ---
 
@@ -155,6 +169,9 @@ Data lives in `%APPDATA%\RbxFarmManager`: `vault.dat` (encrypted accounts), `gam
 - **In game / disconnected** status is read from the text log Roblox writes to
   `%LOCALAPPDATA%\Roblox\logs`. If Roblox changes its log format, update `JOIN_MARKERS` and
   `DISCONNECT_MARKERS` in `core/reconnect.py`.
+- **Window previews** use the public Windows `PrintWindow` API, like a screenshot: nothing is read from
+  the client's memory. Covered windows are captured too, but Windows doesn't draw minimized ones, so a
+  minimized card keeps its last picture. Capturing only runs while the Instances tab is on screen.
 - **Shared real input:** anti-AFK, macros and the autoclicker use the system keyboard and mouse, so a global
   lock makes them take turns; a looping macro releases it between loops so other accounts' anti-AFK can run.
 - **FPS cap** is written to Roblox's `ClientAppSettings.json` and applies to clients launched afterwards.

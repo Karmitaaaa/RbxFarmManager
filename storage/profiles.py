@@ -6,6 +6,7 @@ import time
 from pathlib import Path
 
 from utils.paths import macros_dir
+from utils.i18n import t
 
 _BAD_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 
@@ -13,7 +14,7 @@ _BAD_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 def _safe(name: str) -> str:
     name = _BAD_CHARS.sub("_", name).strip(" .")
     if not name:
-        raise ValueError("Nombre de perfil vacío")
+        raise ValueError(t("Nombre de perfil vacío"))
     return name
 
 
@@ -67,16 +68,16 @@ class MacroProfileStore:
 
     def rename(self, old: str, new: str) -> None:
         if self.exists(new):
-            raise FileExistsError(f"Ya existe un perfil llamado «{new}»")
+            raise FileExistsError(t("Ya existe un perfil llamado «{0}»", new))
         data = self.load(old)
         data["name"] = new
         self._file(new).write_text(json.dumps(data, ensure_ascii=False), "utf-8")
         self._file(old).unlink()
 
     def duplicate(self, name: str) -> str:
-        n, new = 2, f"{name} (copia)"
+        n, new = 2, t("{0} (copia)", name)
         while self.exists(new):
-            new = f"{name} (copia {n})"
+            new = t("{0} (copia {1})", name, n)
             n += 1
         data = self.load(name)
         data["name"] = new
@@ -89,7 +90,7 @@ class MacroProfileStore:
     def import_file(self, path: str) -> str:
         data = json.loads(Path(path).read_text("utf-8"))
         if not isinstance(data.get("events"), list):
-            raise ValueError("El archivo no es un perfil de macro válido")
+            raise ValueError(t("El archivo no es un perfil de macro válido"))
         name = _safe(data.get("name") or Path(path).stem)
         base, n = name, 2
         while self.exists(name):

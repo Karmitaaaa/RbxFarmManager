@@ -7,6 +7,7 @@ import time
 
 from core.models import GameProfile
 from utils.paths import app_dir
+from utils.i18n import t
 
 log = logging.getLogger(__name__)
 
@@ -25,7 +26,7 @@ class GameProfileStore:
             data = json.loads(self.path.read_text("utf-8"))
             self._games = [GameProfile.from_dict(g) for g in data.get("games", [])]
         except Exception as exc:
-            log.error("games.json dañado, se ignora: %s", exc)
+            log.error(t("games.json dañado, se ignora: %s"), exc)
 
     def save(self) -> None:
         with self._lock:
@@ -63,7 +64,7 @@ class GameProfileStore:
             return None
         data = original.to_dict()
         data.pop("id")
-        data.update(name=f"{original.name} (copia)", created=time.time(), last_played=0.0)
+        data.update(name=t("{0} (copia)", original.name), created=time.time(), last_played=0.0)
         copy = GameProfile.from_dict(data)
         self.upsert(copy)
         return copy

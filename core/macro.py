@@ -16,6 +16,7 @@ from PySide6.QtCore import QObject, Signal
 
 from core.timing import high_resolution_timer, wait_until
 from utils import winapi
+from utils.i18n import t
 
 log = logging.getLogger("macros")
 
@@ -61,7 +62,7 @@ class MacroRecorder(QObject):
         self._ms.start()
         self.recording = True
         self.state_changed.emit(True)
-        log.info("Grabación de macro iniciada")
+        log.info(t("Grabación de macro iniciada"))
 
     def stop(self) -> list[dict]:
         if not self.recording:
@@ -75,7 +76,7 @@ class MacroRecorder(QObject):
         for vk in self._held:
             self.events.append({"t": t, "type": "key", "vk": vk, "scan": 0, "ext": False, "down": False})
         self.state_changed.emit(False)
-        log.info("Grabación detenida: %d eventos, %.1f s", len(self.events), t)
+        log.info(t("Grabación detenida: %d eventos, %.1f s"), len(self.events), t)
         return self.events
 
     def _now(self) -> float:
@@ -156,7 +157,7 @@ class MacroPlayer(QObject):
             inst.macro_running = True
         self.state_changed.emit(True)
         target = f" en {inst.account.alias}" if inst else ""
-        log.info("Reproduciendo «%s»%s (x%.2f, %s)", self.current_name, target, speed,
+        log.info(t("Reproduciendo «%s»%s (x%.2f, %s)"), self.current_name, target, speed,
                  "infinito" if repeat == 0 else f"{repeat} veces")
         loops = 0
         try:
@@ -178,7 +179,7 @@ class MacroPlayer(QObject):
             if inst:
                 inst.macro_running = False
             self.state_changed.emit(False)
-            log.info("Macro «%s» detenida tras %d bucle(s)", self.current_name, loops)
+            log.info(t("Macro «%s» detenida tras %d bucle(s)"), self.current_name, loops)
 
     def _play_once(self, events, speed, relative_mouse) -> None:
         held_keys: dict[int, tuple[int, bool]] = {}

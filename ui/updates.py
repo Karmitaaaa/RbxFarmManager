@@ -13,6 +13,7 @@ from ui.icons import G, GlyphLabel
 from ui.widgets import link_button, make_card, muted_label, styled_button
 from ui.workers import run_async
 from utils.version import APP_VERSION
+from utils.i18n import t
 
 log = logging.getLogger("actualizaciones")
 
@@ -48,7 +49,7 @@ class UpdateChecker(QObject):
             self.latest = info
             self.finished.emit(info, "")
             if info and (manual or info.version != self.cfg.get("skipped_version")):
-                log.info("Hay una versión nueva: %s (tienes %s)", info.version, APP_VERSION)
+                log.info(t("Hay una versión nueva: %s (tienes %s)"), info.version, APP_VERSION)
                 self.available.emit(info)
 
         def fail(exc):
@@ -74,14 +75,14 @@ class UpdateBanner(QFrame):
         self.text = QLabel()
         self.text.setStyleSheet("font-weight: 600; background: transparent;")
         lay.addWidget(self.text, 1)
-        btn = styled_button("Actualizar ahora", "primary", self.update_clicked.emit, icon=G.DOWNLOAD)
+        btn = styled_button(t("Actualizar ahora"), "primary", self.update_clicked.emit, icon=G.DOWNLOAD)
         lay.addWidget(btn)
-        lay.addWidget(link_button("Más tarde", self.hide))
+        lay.addWidget(link_button(t("Más tarde"), self.hide))
         self.hide()
 
     def show_for(self, info: updater.UpdateInfo) -> None:
-        self.text.setText(f"Hay una versión nueva de RbxFarm Manager: {info.version} (tienes {APP_VERSION}). "
-                          "Se actualiza con un clic y tus cuentas se conservan.")
+        self.text.setText(t("Hay una versión nueva de RbxFarm Manager: {0} (tienes {1}). Se actualiza con un clic y tus "
+                            "cuentas se conservan.", info.version, APP_VERSION))
         self.show()
 
 
@@ -102,7 +103,7 @@ class UpdateDialog(QDialog):
         self._signals.changed.connect(self._on_progress)
         self._signals.done.connect(self._on_downloaded)
         self._signals.failed.connect(self._on_failed)
-        self.setWindowTitle("Actualización disponible")
+        self.setWindowTitle(t("Actualización disponible"))
         self.setMinimumSize(560, 520)
 
         outer = QVBoxLayout(self)
@@ -111,21 +112,20 @@ class UpdateDialog(QDialog):
         title = QLabel(f"RbxFarm Manager {info.version}")
         title.setObjectName("PageTitle")
         outer.addWidget(title)
-        outer.addWidget(muted_label(f"Tienes la versión {APP_VERSION}. La app descargará la nueva "
-                                    f"({info.size / 1_048_576:.0f} MB), se cerrará un momento y volverá a "
-                                    "abrirse ya actualizada. Tus cuentas, juegos y macros se conservan."))
+        outer.addWidget(muted_label(t("Tienes la versión {0}. La app descargará la nueva ({1:.0f} MB), se cerrará un momento y volverá "
+                                      "a abrirse ya actualizada. Tus cuentas, juegos y macros se conservan.", APP_VERSION, info.size / 1_048_576)))
 
         card, lay = make_card(12, 6)
         head = QHBoxLayout()
-        notes_title = QLabel("Novedades")
+        notes_title = QLabel(t("Novedades"))
         notes_title.setObjectName("CardTitle")
         head.addWidget(notes_title)
         head.addStretch(1)
-        head.addWidget(link_button("Ver en GitHub", lambda: QDesktopServices.openUrl(QUrl(info.page_url))))
+        head.addWidget(link_button(t("Ver en GitHub"), lambda: QDesktopServices.openUrl(QUrl(info.page_url))))
         lay.addLayout(head)
         notes = QTextBrowser()
         notes.setOpenExternalLinks(True)
-        notes.setMarkdown(info.notes or "Sin notas para esta versión.")
+        notes.setMarkdown(info.notes or t("Sin notas para esta versión."))
         notes.setStyleSheet("border: none; background: transparent;")
         lay.addWidget(notes)
         outer.addWidget(card, 1)
@@ -138,12 +138,12 @@ class UpdateDialog(QDialog):
         outer.addWidget(self.status)
 
         row = QHBoxLayout()
-        self.skip_btn = link_button("Saltar esta versión", self._skip)
+        self.skip_btn = link_button(t("Saltar esta versión"), self._skip)
         row.addWidget(self.skip_btn)
         row.addStretch(1)
-        self.later_btn = styled_button("Más tarde", "", self.reject)
+        self.later_btn = styled_button(t("Más tarde"), "", self.reject)
         row.addWidget(self.later_btn)
-        self.update_btn = styled_button("Actualizar ahora", "primary", self._start, icon=G.DOWNLOAD)
+        self.update_btn = styled_button(t("Actualizar ahora"), "primary", self._start, icon=G.DOWNLOAD)
         self.update_btn.setDefault(True)
         row.addWidget(self.update_btn)
         outer.addLayout(row)
@@ -155,13 +155,13 @@ class UpdateDialog(QDialog):
     def _start(self) -> None:
         self.update_btn.setEnabled(False)
         self.skip_btn.setEnabled(False)
-        self.later_btn.setText("Cancelar")
+        self.later_btn.setText(t("Cancelar"))
         self.later_btn.clicked.disconnect()
         self.later_btn.clicked.connect(self._cancel_download)
         self.progress.setRange(0, 100)
         self.progress.setValue(0)
         self.progress.show()
-        self.status.setText("Descargando la actualización desde GitHub…")
+        self.status.setText(t("Descargando la actualización desde GitHub…"))
         threading.Thread(target=self._download, name="update-download", daemon=True).start()
 
     def _download(self) -> None:
@@ -188,11 +188,11 @@ class UpdateDialog(QDialog):
         self.status.setText(f"✖ {error}")
         self.status.setStyleSheet("color: #E2231A;")
         self.update_btn.setEnabled(True)
-        self.update_btn.setText("Reintentar")
+        self.update_btn.setText(t("Reintentar"))
 
     def _on_downloaded(self, path) -> None:
         self.progress.setValue(100)
-        self.status.setText("Instalando… la app se cerrará y se volverá a abrir sola.")
+        self.status.setText(t("Instalando… la app se cerrará y se volverá a abrir sola."))
         QTimer.singleShot(600, lambda: self.on_ready(path))
 
     def closeEvent(self, event):

@@ -8,6 +8,7 @@ from core.autoclicker import AutoClicker
 from core.instance_manager import InstanceManager
 from core.launcher import parse_target
 from core.macro import MacroPlayer, MacroRecorder
+from core.previews import PreviewCapturer
 from storage.config import Config
 from storage.games import GameProfileStore
 from storage.profiles import MacroProfileStore
@@ -15,6 +16,7 @@ from storage.vault import Vault
 from ui.avatars import AvatarCache
 from ui.updates import UpdateChecker
 from utils.hotkeys import HotkeyManager
+from utils.i18n import t
 
 
 class AppContext(QObject):
@@ -40,20 +42,21 @@ class AppContext(QObject):
         self.avatars = AvatarCache(config, vault)
         self.games = GameProfileStore()
         self.updates = UpdateChecker(config)
+        self.previews = PreviewCapturer(self.manager, config)
         self.manager.notify.connect(self.notify)
 
     def launch_game(self, game_id: str) -> str | None:
         """Lanza las cuentas de un perfil de juego. Devuelve un mensaje de error o None."""
         game = self.games.get(game_id)
         if not game:
-            return "El perfil de juego ya no existe."
+            return t("El perfil de juego ya no existe.")
         accounts = [a for a in (self.vault.get(i) for i in game.account_ids) if a]
         if not accounts:
-            return f"«{game.name}» no tiene cuentas asignadas. Edítalo y marca las cuentas que deben entrar."
+            return t("«{0}» no tiene cuentas asignadas. Edítalo y marca las cuentas que deben entrar.", game.name)
         try:
             target = parse_target(game.link, game.job_id, game.private_code)
         except ValueError as exc:
-            return f"El enlace de «{game.name}» no es válido: {exc}"
+            return t("El enlace de «{0}» no es válido: {1}", game.name, exc)
         game.last_played = time.time()
         self.games.upsert(game)
         self.cfg.set("launched_once", True)
@@ -77,6 +80,7 @@ class AppContext(QObject):
     def start(self) -> None:
         self.manager.start()
         self.anti_afk.start()
+        self.previews.start()
         for name, combo in self.cfg.get("hotkeys", {}).items():
             self.hotkeys.set_binding(name, combo)
         self.hotkeys.start()
@@ -88,5 +92,6 @@ class AppContext(QObject):
             self.recorder.stop()
         self.hotkeys.stop()
         self.anti_afk.shutdown()
+        self.previews.shutdown()
         self.manager.shutdown()
         self.cfg.save_if_dirty()

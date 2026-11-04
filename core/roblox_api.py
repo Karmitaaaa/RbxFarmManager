@@ -6,6 +6,7 @@ igual que hace el navegador al pulsar "Jugar". Ningún dato se envía a terceros
 import logging
 
 import requests
+from utils.i18n import t
 
 log = logging.getLogger(__name__)
 
@@ -48,11 +49,11 @@ def get_authenticated_user(cookie: str) -> dict:
     try:
         r = _session(cookie).get("https://users.roblox.com/v1/users/authenticated", timeout=TIMEOUT)
     except requests.RequestException as exc:
-        raise RobloxApiError(f"Sin conexión con Roblox: {exc}") from exc
+        raise RobloxApiError(t("Sin conexión con Roblox: {0}", exc)) from exc
     if r.status_code == 401:
-        raise RobloxAuthError("La cookie no es válida o ha caducado")
+        raise RobloxAuthError(t("La cookie no es válida o ha caducado"))
     if not r.ok:
-        raise RobloxApiError(f"Roblox respondió {r.status_code}")
+        raise RobloxApiError(t("Roblox respondió {0}", r.status_code))
     return r.json()
 
 
@@ -63,10 +64,10 @@ def resolve_user_id(username: str) -> int:
                           headers={"User-Agent": USER_AGENT},
                           json={"usernames": [username], "excludeBannedUsers": False})
     except requests.RequestException as exc:
-        raise RobloxApiError(f"Sin conexión con Roblox: {exc}") from exc
+        raise RobloxApiError(t("Sin conexión con Roblox: {0}", exc)) from exc
     data = r.json().get("data") if r.ok else None
     if not data:
-        raise RobloxApiError(f"No existe el usuario «{username}»")
+        raise RobloxApiError(t("No existe el usuario «{0}»", username))
     return int(data[0]["id"])
 
 
@@ -79,12 +80,12 @@ def fetch_headshot(user_id: int, size: str = "150x150") -> bytes:
         items = r.json().get("data") if r.ok else None
         url = items[0].get("imageUrl") if items and items[0].get("state") == "Completed" else None
         if not url:
-            raise RobloxApiError("La foto del avatar aún no está disponible")
+            raise RobloxApiError(t("La foto del avatar aún no está disponible"))
         img = requests.get(url, timeout=TIMEOUT, headers={"User-Agent": USER_AGENT})
     except requests.RequestException as exc:
-        raise RobloxApiError(f"Sin conexión con Roblox: {exc}") from exc
+        raise RobloxApiError(t("Sin conexión con Roblox: {0}", exc)) from exc
     if not img.ok or not img.content.startswith(b"\x89PNG"):
-        raise RobloxApiError("Respuesta de imagen no válida")
+        raise RobloxApiError(t("Respuesta de imagen no válida"))
     return img.content
 
 
@@ -96,14 +97,14 @@ def game_info(place_id: int) -> dict:
                          headers=headers, timeout=TIMEOUT)
         universe_id = r.json().get("universeId") if r.ok else None
         if not universe_id:
-            raise RobloxApiError("No se encontró ese juego")
+            raise RobloxApiError(t("No se encontró ese juego"))
         r = requests.get("https://games.roblox.com/v1/games", params={"universeIds": universe_id},
                          headers=headers, timeout=TIMEOUT)
         data = r.json().get("data") if r.ok else None
     except requests.RequestException as exc:
-        raise RobloxApiError(f"Sin conexión con Roblox: {exc}") from exc
+        raise RobloxApiError(t("Sin conexión con Roblox: {0}", exc)) from exc
     if not data:
-        raise RobloxApiError("No se encontró ese juego")
+        raise RobloxApiError(t("No se encontró ese juego"))
     game = data[0]
     return {"name": game.get("name", ""), "universe_id": universe_id,
             "playing": game.get("playing", 0), "creator": (game.get("creator") or {}).get("name", "")}
@@ -119,12 +120,12 @@ def fetch_game_icon(place_id: int, size: str = "256x256") -> bytes:
         items = r.json().get("data") if r.ok else None
         url = items[0].get("imageUrl") if items and items[0].get("state") == "Completed" else None
         if not url:
-            raise RobloxApiError("El icono del juego aún no está disponible")
+            raise RobloxApiError(t("El icono del juego aún no está disponible"))
         img = requests.get(url, timeout=TIMEOUT, headers={"User-Agent": USER_AGENT})
     except requests.RequestException as exc:
-        raise RobloxApiError(f"Sin conexión con Roblox: {exc}") from exc
+        raise RobloxApiError(t("Sin conexión con Roblox: {0}", exc)) from exc
     if not img.ok or not img.content.startswith(b"\x89PNG"):
-        raise RobloxApiError("Respuesta de imagen no válida")
+        raise RobloxApiError(t("Respuesta de imagen no válida"))
     return img.content
 
 
@@ -132,13 +133,13 @@ def get_auth_ticket(cookie: str) -> str:
     try:
         r = _post_with_csrf(_session(cookie), "https://auth.roblox.com/v1/authentication-ticket", json={})
     except requests.RequestException as exc:
-        raise RobloxApiError(f"Sin conexión con Roblox: {exc}") from exc
+        raise RobloxApiError(t("Sin conexión con Roblox: {0}", exc)) from exc
     ticket = r.headers.get("rbx-authentication-ticket")
     if ticket:
         return ticket
     if r.status_code == 401:
-        raise RobloxAuthError("La cookie no es válida o ha caducado")
-    raise RobloxApiError(f"No se obtuvo ticket (HTTP {r.status_code})")
+        raise RobloxAuthError(t("La cookie no es válida o ha caducado"))
+    raise RobloxApiError(t("No se obtuvo ticket (HTTP {0})", r.status_code))
 
 
 def resolve_share_link(cookie: str, code: str) -> tuple[int, str]:
@@ -147,12 +148,12 @@ def resolve_share_link(cookie: str, code: str) -> tuple[int, str]:
         r = _post_with_csrf(_session(cookie), "https://apis.roblox.com/sharelinks/v1/resolve-link",
                             json={"linkId": code, "linkType": "Server"})
     except requests.RequestException as exc:
-        raise RobloxApiError(f"Sin conexión con Roblox: {exc}") from exc
+        raise RobloxApiError(t("Sin conexión con Roblox: {0}", exc)) from exc
     if r.status_code == 401:
-        raise RobloxAuthError("La cookie no es válida o ha caducado")
+        raise RobloxAuthError(t("La cookie no es válida o ha caducado"))
     if not r.ok:
-        raise RobloxApiError(f"No se pudo resolver el enlace (HTTP {r.status_code})")
+        raise RobloxApiError(t("No se pudo resolver el enlace (HTTP {0})", r.status_code))
     data = r.json().get("privateServerInviteData") or {}
     if not data.get("placeId") or not data.get("linkCode"):
-        raise RobloxApiError("El enlace compartido no es de un servidor privado válido")
+        raise RobloxApiError(t("El enlace compartido no es de un servidor privado válido"))
     return int(data["placeId"]), str(data["linkCode"])

@@ -16,19 +16,20 @@ from core.models import ST_INGAME, ST_OPEN
 from storage.config import Config
 from utils import winapi
 from utils.hotkeys import vk_from_name
+from utils.i18n import N_, t
 
 log = logging.getLogger("anti-afk")
 
 ACTIONS = {
-    "jump": "Saltar (Espacio)",
-    "walk": "Paso adelante/atrás (W/S)",
-    "camera": "Girar cámara (← →)",
-    "key": "Tecla personalizada",
-    "click": "Click derecho en el centro",
+    "jump": N_("Saltar (Espacio)"),
+    "walk": N_("Paso adelante/atrás (W/S)"),
+    "camera": N_("Girar cámara (← →)"),
+    "key": N_("Tecla personalizada"),
+    "click": N_("Click derecho en el centro"),
 }
 METHODS = {
-    "focus": "Foco breve + SendInput (recomendado)",
-    "post": "Mensajes de ventana (sin foco, puede no funcionar)",
+    "focus": N_("Foco breve + SendInput (recomendado)"),
+    "post": N_("Mensajes de ventana (sin foco, puede no funcionar)"),
 }
 
 VK_SPACE, VK_W, VK_S, VK_LEFT, VK_RIGHT = 0x20, 0x57, 0x53, 0x25, 0x27
@@ -91,7 +92,7 @@ class AntiAfk(QObject):
                 previous = winapi.foreground_window()
                 was_minimized = winapi.is_minimized(hwnd)
                 if not winapi.focus_window(hwnd):
-                    log.warning("%s: no se pudo enfocar la ventana para el anti-AFK", inst.account.alias)
+                    log.warning(t("%s: no se pudo enfocar la ventana para el anti-AFK"), inst.account.alias)
                     return
                 time.sleep(0.12)
                 self._do_sendinput(hwnd, action)
@@ -101,7 +102,7 @@ class AntiAfk(QObject):
                 if previous and previous != hwnd and winapi.is_window(previous):
                     winapi.focus_window(previous)
         inst.last_afk_at = time.time()
-        log.info("%s: anti-AFK (%s)", inst.account.alias, ACTIONS.get(action, action))
+        log.info(t("%s: anti-AFK (%s)"), inst.account.alias, t(ACTIONS.get(action, action)))
         self.acted.emit(inst.id)
 
     def _custom_vk(self) -> int:

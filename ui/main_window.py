@@ -1,5 +1,8 @@
 """Ventana principal: barra azul superior, menú lateral con secciones, páginas, bandeja y hotkeys."""
 import logging
+import os
+import subprocess
+import sys
 
 from PySide6.QtCore import QObject, Qt, QTimer, Signal
 from PySide6.QtGui import QAction, QCursor
@@ -21,28 +24,29 @@ from ui.tabs.macros_tab import MacrosTab
 from ui.updates import UpdateBanner, UpdateDialog
 from utils.logger import ui_handler
 from utils.version import APP_VERSION
+from utils.i18n import N_, t
 
 log = logging.getLogger("ui")
 
 # clave, nombre corto, icono, título de la cabecera, explicación (None = sin cabecera)
 PAGES = [
-    ("accounts", "Inicio", G.HOME, None, None),
-    ("games", "Juegos", G.GAME, "Juegos",
-     "Un perfil por juego: a qué servidor entrar, con qué cuentas y qué macro usar. Después solo pulsa «Jugar»."),
-    ("instances", "Instancias", G.MONITOR, "Instancias abiertas",
-     "Todas las ventanas de Roblox que gestiona la app: estado, consumo y botones para verlas, reiniciarlas o cerrarlas."),
-    ("afk", "Anti-AFK", G.TIMER, "Anti-AFK y reconexión",
-     "Evita que Roblox te expulse por inactividad y vuelve a entrar solo si se cae el juego o internet."),
+    ("accounts", N_("Inicio"), G.HOME, None, None),
+    ("games", N_("Juegos"), G.GAME, N_("Juegos"),
+     N_("Un perfil por juego: a qué servidor entrar, con qué cuentas y qué macro usar. Después solo pulsa «Jugar».")),
+    ("instances", N_("Instancias"), G.MONITOR, N_("Instancias abiertas"),
+     N_("Todas las ventanas de Roblox que gestiona la app: vista previa, estado, consumo y botones para verlas, reiniciarlas o cerrarlas.")),
+    ("afk", "Anti-AFK", G.TIMER, N_("Anti-AFK y reconexión"),
+     N_("Evita que Roblox te expulse por inactividad y vuelve a entrar solo si se cae el juego o internet.")),
     ("clicker", "Autoclicker", G.MOUSE, "Autoclicker",
-     "Clics automáticos con intervalo, posición y hotkey global. Guarda presets para usarlos en tus juegos."),
+     N_("Clics automáticos con intervalo, posición y hotkey global. Guarda presets para usarlos en tus juegos.")),
     ("macros", "Macros", G.RECORD, "Macros",
-     "Graba lo que haces con el teclado y el ratón y repítelo. Cada macro puede guardarse dentro de su juego."),
-    ("log", "Registro", G.DOC, "Registro y ajustes",
-     "Todo lo que ocurre, con fecha y hora, y las opciones de la aplicación."),
+     N_("Graba lo que haces con el teclado y el ratón y repítelo. Cada macro puede guardarse dentro de su juego.")),
+    ("log", N_("Registro"), G.DOC, N_("Registro y ajustes"),
+     N_("Todo lo que ocurre, con fecha y hora, y las opciones de la aplicación.")),
 ]
 SIDEBAR_SECTIONS = [("", ["accounts", "games", "instances"]),
-                    ("AUTOMATIZACIÓN", ["afk", "clicker", "macros"]),
-                    ("SISTEMA", ["log"])]
+                    (N_("AUTOMATIZACIÓN"), ["afk", "clicker", "macros"]),
+                    (N_("SISTEMA"), ["log"])]
 TOP_NAV = ["accounts", "games", "instances", "macros"]
 
 
@@ -131,13 +135,13 @@ class MainWindow(QMainWindow):
         for key, _label, glyph, title, subtitle in PAGES:
             page = self.pages[key]
             if title:
-                header = widgets.PageHeader(glyph, title, subtitle)
+                header = widgets.PageHeader(glyph, t(title), t(subtitle))
                 page.body.insertWidget(0, header)
                 if key == "games":
-                    header.add_action(widgets.styled_button("Nuevo perfil de juego", "secondary",
+                    header.add_action(widgets.styled_button(t("Nuevo perfil de juego"), "secondary",
                                                             lambda: page.actions.new(), icon=G.ADD))
                 elif key == "instances":
-                    header.add_action(widgets.styled_button("Minimizar todas", "", ctx.manager.minimize_all,
+                    header.add_action(widgets.styled_button(t("Minimizar todas"), "", ctx.manager.minimize_all,
                                                             icon=G.DOWNLOAD))
             self.stack.addWidget(page)
 
@@ -167,14 +171,14 @@ class MainWindow(QMainWindow):
         self.update_counters()
         self.update_play_button()
         ctx.updates.start()
-        log.info("RbxFarm Manager %s listo", APP_VERSION)
+        log.info(t("RbxFarm Manager %s listo"), APP_VERSION)
 
     # ------------------------------------------------------------------ actualizaciones
     def on_update_available(self, info) -> None:
         self.update_banner.show_for(info)
-        self.ctx.notify.emit("info", f"Hay una versión nueva disponible: {info.version}")
+        self.ctx.notify.emit("info", t("Hay una versión nueva disponible: {0}", info.version))
         if not self.isVisible():
-            self.tray.showMessage("RbxFarm Manager", f"Versión {info.version} disponible. Ábreme para actualizar.",
+            self.tray.showMessage("RbxFarm Manager", t("Versión {0} disponible. Ábreme para actualizar.", info.version),
                                   QSystemTrayIcon.Information, 6000)
 
     def open_update_dialog(self) -> None:
@@ -190,13 +194,29 @@ class MainWindow(QMainWindow):
         try:
             updater.launch_installer(path)
         except OSError as exc:
-            QMessageBox.critical(self, "Actualizar", f"No se pudo iniciar el instalador: {exc}")
+            QMessageBox.critical(self, t("Actualizar"), t("No se pudo iniciar el instalador: {0}", exc))
             return
+        self._quit_now()
+
+    def _quit_now(self) -> None:
+        """Cierra la app sin preguntar: las instancias de Roblox siguen abiertas."""
         self._quitting = True
         self.ctx.shutdown()
         self.tray.hide()
         ui_handler.sink = None
         QApplication.instance().quit()
+
+    def restart_app(self) -> None:
+        """Para aplicar otro idioma: abre una copia nueva de la app y cierra esta."""
+        args = sys.argv[1:] if getattr(sys, "frozen", False) else sys.argv
+        try:
+            subprocess.Popen([sys.executable, *args], close_fds=True,
+                             creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,
+                             env={**os.environ, "PYINSTALLER_RESET_ENVIRONMENT": "1"})
+        except OSError as exc:
+            QMessageBox.critical(self, t("Idioma"), t("No se pudo reiniciar la app: {0}", exc))
+            return
+        self._quit_now()
 
     # ------------------------------------------------------------------ construcción
     def _icon_button(self, glyph: str, tip: str, slot) -> QPushButton:
@@ -217,7 +237,7 @@ class MainWindow(QMainWindow):
         lay.setContentsMargins(4, 0, 10, 0)
         lay.setSpacing(0)
 
-        lay.addWidget(self._icon_button(G.MENU, "Mostrar u ocultar el menú", self.toggle_sidebar))
+        lay.addWidget(self._icon_button(G.MENU, t("Mostrar u ocultar el menú"), self.toggle_sidebar))
         brand = QLabel("RbxFarm")
         brand.setObjectName("Brand")
         lay.addWidget(brand)
@@ -225,7 +245,7 @@ class MainWindow(QMainWindow):
         self.nav_buttons = {}
         labels = {key: label for key, label, *_ in PAGES}
         for key in TOP_NAV:
-            btn = QPushButton(labels[key])
+            btn = QPushButton(t(labels[key]))
             btn.setObjectName("NavButton")
             btn.setCursor(Qt.PointingHandCursor)
             btn.clicked.connect(lambda _=False, k=key: self.navigate(k))
@@ -235,7 +255,7 @@ class MainWindow(QMainWindow):
         lay.addSpacing(14)
         self.search = QLineEdit()
         self.search.setObjectName("TopSearch")
-        self.search.setPlaceholderText("Buscar cuentas…")
+        self.search.setPlaceholderText(t("Buscar cuentas…"))
         self.search.addAction(glyph_icon(G.SEARCH, "#757575", 14), QLineEdit.TrailingPosition)
         self.search.setMaximumWidth(300)
         self.search.setMinimumWidth(170)
@@ -246,13 +266,13 @@ class MainWindow(QMainWindow):
         self.top_stat = QLabel()
         self.top_stat.setObjectName("TopStat")
         lay.addWidget(self.top_stat)
-        lay.addWidget(self._icon_button(G.BELL, "Notificaciones", lambda: self.dock.toggle()))
+        lay.addWidget(self._icon_button(G.BELL, t("Notificaciones"), lambda: self.dock.toggle()))
         self.badge = QLabel()
         self.badge.setObjectName("Badge")
         self.badge.setAlignment(Qt.AlignCenter)
         self.badge.hide()
         lay.addWidget(self.badge)
-        lay.addWidget(self._icon_button(G.SETTINGS, "Registro y ajustes", lambda: self.navigate("log")))
+        lay.addWidget(self._icon_button(G.SETTINGS, t("Registro y ajustes"), lambda: self.navigate("log")))
         return bar
 
     def _build_sidebar(self) -> QWidget:
@@ -266,19 +286,19 @@ class MainWindow(QMainWindow):
         self.side_items: dict[str, SideItem] = {}
         for section, keys in SIDEBAR_SECTIONS:
             if section:
-                title = QLabel(section)
+                title = QLabel(t(section))
                 title.setObjectName("SideSection")
                 lay.addWidget(title)
             for key in keys:
                 label, glyph, subtitle = meta[key]
-                item = SideItem(glyph, label)
-                item.setToolTip(subtitle or "Saludo, primeros pasos, tus juegos y tus cuentas")
+                item = SideItem(glyph, t(label))
+                item.setToolTip(t(subtitle) if subtitle else t("Saludo, primeros pasos, tus juegos y tus cuentas"))
                 item.clicked.connect(lambda _=False, k=key: self.navigate(k))
                 lay.addWidget(item)
                 self.side_items[key] = item
         lay.addStretch(1)
 
-        self.side_play = widgets.styled_button("Jugar", "primary", self._play_last, icon=G.PLAY)
+        self.side_play = widgets.styled_button(t("Jugar"), "primary", self._play_last, icon=G.PLAY)
         self.side_play.setMinimumHeight(38)
         wrap = QVBoxLayout()
         wrap.setContentsMargins(14, 0, 14, 0)
@@ -298,15 +318,15 @@ class MainWindow(QMainWindow):
         self.tray = QSystemTrayIcon(widgets.app_icon(), self)
         self.tray.setToolTip("RbxFarm Manager")
         menu = QMenu()
-        menu.addAction("Mostrar", self.show_window)
-        menu.addAction("Jugar el último juego", self._play_last)
-        self.tray_clicker = QAction("Iniciar autoclicker", self)
+        menu.addAction(t("Mostrar"), self.show_window)
+        menu.addAction(t("Jugar el último juego"), self._play_last)
+        self.tray_clicker = QAction(t("Iniciar autoclicker"), self)
         self.tray_clicker.triggered.connect(lambda: self.pages["clicker"].toggle())
         menu.addAction(self.tray_clicker)
-        menu.addAction("Detener macro", self.ctx.player.stop)
-        menu.addAction("Minimizar instancias", self.ctx.manager.minimize_all)
+        menu.addAction(t("Detener macro"), self.ctx.player.stop)
+        menu.addAction(t("Minimizar instancias"), self.ctx.manager.minimize_all)
         menu.addSeparator()
-        menu.addAction("Salir", self.quit_app)
+        menu.addAction(t("Salir"), self.quit_app)
         self.tray.setContextMenu(menu)
         self.tray.activated.connect(lambda reason: self.show_window()
                                     if reason in (QSystemTrayIcon.DoubleClick, QSystemTrayIcon.Trigger) else None)
@@ -324,6 +344,9 @@ class MainWindow(QMainWindow):
             return
         if target == "update":
             self.open_update_dialog()
+            return
+        if target == "restart":
+            self.restart_app()
             return
         if target.startswith("macros:"):
             self.pages["macros"].set_game_filter(target[7:])
@@ -357,13 +380,13 @@ class MainWindow(QMainWindow):
     def update_play_button(self) -> None:
         game = self._last_game()
         if game:
-            self.side_play.setText("Jugar")
-            self.side_play_hint.setText(f"Último juego: {game.name}")
-            self.side_play.setToolTip(f"Abrir «{game.name}» con sus cuentas")
+            self.side_play.setText(t("Jugar"))
+            self.side_play_hint.setText(t("Último juego: {0}", game.name))
+            self.side_play.setToolTip(t("Abrir «{0}» con sus cuentas", game.name))
         else:
-            self.side_play.setText("Crear un juego")
-            self.side_play_hint.setText("Aún no tienes perfiles de juego")
-            self.side_play.setToolTip("Ir a Juegos para crear tu primer perfil")
+            self.side_play.setText(t("Crear un juego"))
+            self.side_play_hint.setText(t("Aún no tienes perfiles de juego"))
+            self.side_play.setToolTip(t("Ir a Juegos para crear tu primer perfil"))
 
     def _run_menu(self, inst_id: str) -> None:
         inst = self.ctx.manager.get(inst_id)
@@ -372,16 +395,16 @@ class MainWindow(QMainWindow):
         macro_name, preset = self.ctx.macro_for(inst)
         menu = QMenu(self)
         macro = menu.addAction(glyph_icon(G.PLAY, theme.ACCENTS["green"]),
-                               f"Reproducir macro «{macro_name}»" if macro_name else "Reproducir macro (no tiene)")
+                               t("Reproducir macro «{0}»", macro_name) if macro_name else t("Reproducir macro (no tiene)"))
         macro.setEnabled(bool(macro_name))
         macro.triggered.connect(lambda: self.pages["macros"].play(macro_name, inst))
-        menu.addAction(glyph_icon(G.LIST), "Elegir otra macro…",
+        menu.addAction(glyph_icon(G.LIST), t("Elegir otra macro…"),
                        lambda: (self.pages["macros"].select_target(inst_id), self.navigate("macros")))
         menu.addSeparator()
-        clicker = menu.addAction(glyph_icon(G.MOUSE), f"Iniciar autoclicker «{preset}»" if preset
-                                 else "Iniciar autoclicker (ajustes actuales)")
+        clicker = menu.addAction(glyph_icon(G.MOUSE), t("Iniciar autoclicker «{0}»", preset) if preset
+                                 else t("Iniciar autoclicker (ajustes actuales)"))
         clicker.triggered.connect(lambda: self.pages["clicker"].start_for_instance(inst_id, preset))
-        menu.addAction(glyph_icon(G.STOP, theme.ACCENTS["red"]), "Detener macro y autoclicker",
+        menu.addAction(glyph_icon(G.STOP, theme.ACCENTS["red"]), t("Detener macro y autoclicker"),
                        lambda: (self.ctx.player.stop(), self.ctx.clicker.stop()))
         menu.exec(QCursor.pos())
 
@@ -421,15 +444,15 @@ class MainWindow(QMainWindow):
         instances = self.ctx.manager.snapshot()
         in_game = sum(1 for i in instances if i.status == ST_INGAME)
         active = sum(1 for i in instances if i.status in ACTIVE_STATES)
-        self.top_stat.setText(f"● {in_game}/{len(instances)} en juego")
-        self.tray.setToolTip(f"RbxFarm Manager — {in_game}/{len(instances)} en juego")
+        self.top_stat.setText(t("● {0}/{1} en juego", in_game, len(instances)))
+        self.tray.setToolTip(t("RbxFarm Manager — {0}/{1} en juego", in_game, len(instances)))
         self.side_items["instances"].set_count(active)
         unread = self.dock.unread
         self.badge.setText(str(unread))
         self.badge.setVisible(unread > 0)
 
     def _tray_state(self, running: bool) -> None:
-        self.tray_clicker.setText("Detener autoclicker" if running else "Iniciar autoclicker")
+        self.tray_clicker.setText(t("Detener autoclicker") if running else t("Iniciar autoclicker"))
 
     def apply_theme(self, name: str) -> None:
         widgets.current_theme["name"] = name if name in theme.PALETTES else "classic"
@@ -451,7 +474,7 @@ class MainWindow(QMainWindow):
             event.ignore()
             self.hide()
             if not self._tray_hint_shown:
-                self.tray.showMessage("RbxFarm Manager", "Sigo funcionando en la bandeja. Clic derecho para salir.",
+                self.tray.showMessage("RbxFarm Manager", t("Sigo funcionando en la bandeja. Clic derecho para salir."),
                                       QSystemTrayIcon.Information, 3000)
                 self._tray_hint_shown = True
             return
@@ -464,8 +487,8 @@ class MainWindow(QMainWindow):
         active = [i for i in self.ctx.manager.snapshot() if i.pid]
         if active:
             answer = QMessageBox.question(
-                self, "Salir", f"Hay {len(active)} instancia(s) de Roblox abiertas.\n"
-                "¿Cerrarlas también? (No = dejarlas abiertas sin vigilancia)",
+                self, t("Salir"), t("Hay {0} instancia(s) de Roblox abiertas.\n¿Cerrarlas también? (No = dejarlas abiertas sin "
+                                 "vigilancia)", len(active)),
                 QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel)
             if answer == QMessageBox.Cancel:
                 self._quitting = False

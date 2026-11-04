@@ -8,10 +8,11 @@ from PySide6.QtCore import QObject, Signal
 
 from core.timing import high_resolution_timer, wait_until
 from utils import winapi
+from utils.i18n import N_, t
 
 log = logging.getLogger("autoclicker")
 
-BUTTONS = {"left": "Izquierdo", "right": "Derecho", "middle": "Medio"}
+BUTTONS = {"left": N_("Izquierdo"), "right": N_("Derecho"), "middle": N_("Medio")}
 
 
 class AutoClicker(QObject):
@@ -73,7 +74,7 @@ class AutoClicker(QObject):
                 x, y = rect[0] + x, rect[1] + y
 
         self.state_changed.emit(True)
-        log.info("Autoclicker iniciado (%s, %d ms ±%d, %s)", BUTTONS.get(button, button),
+        log.info(t("Autoclicker iniciado (%s, %d ms ±%d, %s)"), t(BUTTONS.get(button, button)),
                  int(interval * 1000), int(jitter * 1000), "infinito" if not limit else f"{limit} clicks")
         count = 0
         try:
@@ -96,4 +97,4 @@ class AutoClicker(QObject):
         finally:
             self.progress.emit(count)
             self.state_changed.emit(False)
-            log.info("Autoclicker detenido tras %d clicks", count)
+            log.info(t("Autoclicker detenido tras %d clicks"), count)

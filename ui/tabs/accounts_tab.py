@@ -19,19 +19,20 @@ from ui.icons import G, icon_font
 from ui.tabs.games_tab import GameActions, update_card_status
 from ui.widgets import (AddCard, Avatar, AvatarTile, GameCard, HStrip, IconCircle, Page, SectionHeader, clear_layout,
                         link_button, make_card, muted_label, styled_button)
+from utils.i18n import N_, t
 
 log = logging.getLogger("cuentas")
 
-COLS = ["", "Alias", "Usuario", "Inicio de sesión", "Etiquetas", "Macro", "Notas"]
+COLS = ["", "Alias", N_("Usuario"), N_("Inicio de sesión"), N_("Etiquetas"), "Macro", N_("Notas")]
 
 
 def greeting(hour: int | None = None) -> str:
     hour = time.localtime().tm_hour if hour is None else hour
     if 5 <= hour < 12:
-        return "Buenos días"
+        return t("Buenos días")
     if 12 <= hour < 20:
-        return "Buenas tardes"
-    return "Buenas noches"
+        return t("Buenas tardes")
+    return t("Buenas noches")
 
 
 class ClickableAvatar(Avatar):
@@ -59,7 +60,7 @@ class AccountsTab(Page):
         hello_row = QHBoxLayout()
         hello_row.setContentsMargins(0, 8, 0, 0)
         self.hello_avatar = ClickableAvatar("RF", "RbxFarm", 104)
-        self.hello_avatar.setToolTip("Clic para elegir la cuenta principal")
+        self.hello_avatar.setToolTip(t("Clic para elegir la cuenta principal"))
         self.hello_avatar.clicked.connect(self._choose_main_menu)
         hello_row.addWidget(self.hello_avatar)
         hello_text = QVBoxLayout()
@@ -85,12 +86,12 @@ class AccountsTab(Page):
         head.addWidget(IconCircle(G.FLASH, 36, theme.ACCENTS["green"]))
         head_text = QVBoxLayout()
         head_text.setSpacing(0)
-        title = QLabel("Primeros pasos")
+        title = QLabel(t("Primeros pasos"))
         title.setObjectName("CardTitle")
         head_text.addWidget(title)
-        head_text.addWidget(muted_label("Sigue estos pasos una vez y después solo tendrás que pulsar «Jugar»."))
+        head_text.addWidget(muted_label(t("Sigue estos pasos una vez y después solo tendrás que pulsar «Jugar».")))
         head.addLayout(head_text, 1)
-        head.addWidget(link_button("Ocultar", self._hide_onboarding))
+        head.addWidget(link_button(t("Ocultar"), self._hide_onboarding))
         lay.addLayout(head)
         self.steps = QVBoxLayout()
         self.steps.setSpacing(4)
@@ -100,54 +101,54 @@ class AccountsTab(Page):
         # ---------------- Continuar jugando (perfiles de juego)
         self.game_actions = GameActions(ctx, self)
         self.game_cards: dict[str, GameCard] = {}
-        games_header = SectionHeader("Continuar jugando")
-        games_header.add_link("Ver todos", lambda: ctx.navigate.emit("games"))
-        games_header.add_link("+ Nuevo perfil", lambda: self.game_actions.new())
+        games_header = SectionHeader(t("Continuar jugando"))
+        games_header.add_link(t("Ver todos"), lambda: ctx.navigate.emit("games"))
+        games_header.add_link(t("+ Nuevo perfil"), lambda: self.game_actions.new())
         self.body.addWidget(games_header)
         self.games_strip = HStrip(318)
         self.body.addWidget(self.games_strip)
 
         # ---------------- Cuentas (avatares)
-        self.accounts_header = SectionHeader("Cuentas (0)")
-        self.accounts_header.add_link("Todas", self.select_all)
-        self.accounts_header.add_link("Ninguna", self.select_none)
-        self.accounts_header.add_link("+ Agregar", self.add_account)
+        self.accounts_header = SectionHeader(t("Cuentas (0)"))
+        self.accounts_header.add_link(t("Todas"), self.select_all)
+        self.accounts_header.add_link(t("Ninguna"), self.select_none)
+        self.accounts_header.add_link(t("+ Agregar"), self.add_account)
         self.body.addWidget(self.accounts_header)
         card, lay = make_card(14, 6)
         self.strip = HStrip(116)
         lay.addWidget(self.strip)
-        self.empty_hint = muted_label("Aún no hay cuentas. Pulsa «+ Agregar» para crear la primera.")
+        self.empty_hint = muted_label(t("Aún no hay cuentas. Pulsa «+ Agregar» para crear la primera."))
         lay.addWidget(self.empty_hint)
-        legend = muted_label("Clic en un avatar para seleccionarlo · doble clic para editar · "
-                             "punto verde = en juego, azul = abriendo, naranja = reconectando")
+        legend = muted_label(t("Clic en un avatar para seleccionarlo · doble clic para editar · "
+                             "punto verde = en juego, azul = abriendo, naranja = reconectando"))
         legend.setStyleSheet("font-size: 8.5pt;")
         lay.addWidget(legend)
         self.body.addWidget(card)
 
         # ---------------- Juego rápido (sin perfil)
-        quick_header = SectionHeader("Juego rápido")
-        quick_header.add_link("Guardar como perfil de juego",
+        quick_header = SectionHeader(t("Juego rápido"))
+        quick_header.add_link(t("Guardar como perfil de juego"),
                               lambda: self.game_actions.new(self.link.text().strip(), list(self.selected)))
         self.body.addWidget(quick_header)
         card, lay = make_card(16, 10)
-        lay.addWidget(muted_label("Para probar un juego una vez con las cuentas seleccionadas arriba. Si lo vas a "
-                                  "repetir, guárdalo como perfil de juego."))
+        lay.addWidget(muted_label(t("Para probar un juego una vez con las cuentas seleccionadas arriba. Si lo vas a "
+                                  "repetir, guárdalo como perfil de juego.")))
         grid = QGridLayout()
         grid.setHorizontalSpacing(10)
         grid.setVerticalSpacing(8)
         self.link = QLineEdit(ctx.cfg.get("last_link", ""))
-        self.link.setPlaceholderText("PlaceId o enlace: https://www.roblox.com/games/123456/…  "
-                                     "(también enlaces de servidor privado o /share?code=…)")
+        self.link.setPlaceholderText(t("PlaceId o enlace: https://www.roblox.com/games/123456/…  "
+                                     "(también enlaces de servidor privado o /share?code=…)"))
         self.job = QLineEdit()
-        self.job.setPlaceholderText("JobId (opcional) para entrar a un servidor concreto")
-        self.private_chk = QCheckBox("Servidor privado")
+        self.job.setPlaceholderText(t("JobId (opcional) para entrar a un servidor concreto"))
+        self.private_chk = QCheckBox(t("Servidor privado"))
         self.private_code = QLineEdit()
-        self.private_code.setPlaceholderText("Código del servidor privado (linkCode)")
+        self.private_code.setPlaceholderText(t("Código del servidor privado (linkCode)"))
         self.private_code.setEnabled(False)
         self.private_chk.toggled.connect(self.private_code.setEnabled)
-        grid.addWidget(QLabel("Juego"), 0, 0)
+        grid.addWidget(QLabel(t("Juego")), 0, 0)
         grid.addWidget(self.link, 0, 1, 1, 3)
-        grid.addWidget(QLabel("Servidor"), 1, 0)
+        grid.addWidget(QLabel(t("Servidor")), 1, 0)
         grid.addWidget(self.job, 1, 1)
         grid.addWidget(self.private_chk, 1, 2)
         grid.addWidget(self.private_code, 1, 3)
@@ -157,22 +158,22 @@ class AccountsTab(Page):
         play_row = QHBoxLayout()
         self.play_hint = muted_label("")
         play_row.addWidget(self.play_hint, 1)
-        self.play_btn = styled_button("Jugar", "primary", self.launch_selected, big=True, icon=G.PLAY)
+        self.play_btn = styled_button(t("Jugar"), "primary", self.launch_selected, big=True, icon=G.PLAY)
         self.play_btn.setMinimumWidth(220)
         play_row.addWidget(self.play_btn)
         lay.addLayout(play_row)
         self.body.addWidget(card)
 
         # ---------------- Tabla de cuentas
-        table_header = SectionHeader("Detalle de cuentas")
-        table_header.add_link("Editar", self.edit_current)
-        table_header.add_link("Eliminar", self.delete_selected)
-        table_header.add_link("Importar", self.import_accounts)
-        table_header.add_link("Exportar", self.export_accounts)
+        table_header = SectionHeader(t("Detalle de cuentas"))
+        table_header.add_link(t("Editar"), self.edit_current)
+        table_header.add_link(t("Eliminar"), self.delete_selected)
+        table_header.add_link(t("Importar"), self.import_accounts)
+        table_header.add_link(t("Exportar"), self.export_accounts)
         self.body.addWidget(table_header)
         card, lay = make_card(0, 0)
         self.table = QTableWidget(0, len(COLS))
-        self.table.setHorizontalHeaderLabels(COLS)
+        self.table.setHorizontalHeaderLabels([t(c) for c in COLS])
         self.table.verticalHeader().hide()
         self.table.setAlternatingRowColors(True)
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
@@ -215,7 +216,7 @@ class AccountsTab(Page):
             self.games_strip.add(card)
             self.game_cards[game.id] = card
             height = max(height, card.sizeHint().height())
-        add = AddCard("Nuevo perfil de juego", 178, height or 264)
+        add = AddCard(t("Nuevo perfil de juego"), 178, height or 264)
         self.games_strip.setFixedHeight((height or 264) + 14)
         add.clicked.connect(lambda: self.game_actions.new())
         self.games_strip.add(add)
@@ -225,13 +226,13 @@ class AccountsTab(Page):
     def refresh_onboarding(self) -> None:
         cfg = self.ctx.cfg
         steps = [
-            ("Agrega tu primera cuenta", "Con su cookie o con la sesión de Roblox que ya tengas abierta.",
-             bool(self.accounts), "Agregar cuenta", self.add_account),
-            ("Crea un perfil de juego", "Elige el juego (o servidor privado) y qué cuentas entran.",
-             bool(self.ctx.games.all()), "Crear perfil", lambda: self.game_actions.new()),
-            ("Graba una macro (opcional)", "En Macros: elige el juego en el filtro y pulsa Grabar.",
-             bool(self.ctx.profiles.names()), "Ir a Macros", lambda: self.ctx.navigate.emit("macros")),
-            ("Pulsa «Jugar» en la tarjeta del juego", "Se abren todas sus cuentas, con anti-AFK y reconexión.",
+            (t("Agrega tu primera cuenta"), t("Con su cookie o con la sesión de Roblox que ya tengas abierta."),
+             bool(self.accounts), t("Agregar cuenta"), self.add_account),
+            (t("Crea un perfil de juego"), t("Elige el juego (o servidor privado) y qué cuentas entran."),
+             bool(self.ctx.games.all()), t("Crear perfil"), lambda: self.game_actions.new()),
+            (t("Graba una macro (opcional)"), t("En Macros: elige el juego en el filtro y pulsa Grabar."),
+             bool(self.ctx.profiles.names()), t("Ir a Macros"), lambda: self.ctx.navigate.emit("macros")),
+            (t("Pulsa «Jugar» en la tarjeta del juego"), t("Se abren todas sus cuentas, con anti-AFK y reconexión."),
              bool(cfg.get("launched_once")), "", None),
         ]
         done = sum(1 for s in steps if s[2])
@@ -279,12 +280,12 @@ class AccountsTab(Page):
             detail = f"@{acc.username}" if acc.username else acc.alias
             if acc.username and acc.alias.lower() != acc.username.lower():
                 detail += f"  ·  {acc.alias}"
-            self.hello_user.setText(detail + "  ·  cuenta principal")
+            self.hello_user.setText(detail + t("  ·  cuenta principal"))
         else:
             name = os.environ.get("USERNAME") or "jugador"
             self.hello_avatar.text, self.hello_avatar.seed = name[:2].upper(), name
             self.hello_avatar.set_photo(None)
-            self.hello_user.setText("Agrega una cuenta para ver aquí su nombre y su foto")
+            self.hello_user.setText(t("Agrega una cuenta para ver aquí su nombre y su foto"))
         self.hello_title.setText(f"{greeting()}, {name}")
 
     def set_main_account(self, acc_id: str) -> None:
@@ -296,7 +297,7 @@ class AccountsTab(Page):
             return self.add_account()
         current = self.main_account()
         menu = QMenu(self)
-        menu.addSection("Cuenta principal")
+        menu.addSection(t("Cuenta principal"))
         for acc in self.accounts:
             label = f"{acc.alias} (@{acc.username})" if acc.username else acc.alias
             action = menu.addAction(label, lambda a=acc.id: self.set_main_account(a))
@@ -354,7 +355,7 @@ class AccountsTab(Page):
             self.strip.add(tile)
             self.tiles[acc.id] = tile
         self.empty_hint.setVisible(not self.accounts)
-        self.accounts_header.set_title(f"Cuentas ({len(self.accounts)})")
+        self.accounts_header.set_title(t("Cuentas ({0})", len(self.accounts)))
 
         self.table.setRowCount(len(visible))
         for row, acc in enumerate(visible):
@@ -363,7 +364,7 @@ class AccountsTab(Page):
             chk.setCheckState(Qt.Checked if acc.id in self.selected else Qt.Unchecked)
             chk.setData(Qt.UserRole, acc.id)
             self.table.setItem(row, 0, chk)
-            values = [acc.alias, acc.username or "—", LOGIN_METHODS.get(acc.login_method, acc.login_method),
+            values = [acc.alias, acc.username or "—", t(LOGIN_METHODS.get(acc.login_method, acc.login_method)),
                       ", ".join(acc.tags), acc.macro_profile or "—", acc.notes.replace("\n", " ")]
             for col, value in enumerate(values, start=1):
                 item = QTableWidgetItem(value)
@@ -387,14 +388,13 @@ class AccountsTab(Page):
         for acc_id, tile in self.tiles.items():
             tile.set_badge(colors.get(running.get(acc_id)))
         in_game = sum(1 for s in running.values() if s == ST_INGAME)
-        self.hello_sub.setText(f"{len(self.accounts)} cuentas guardadas · {in_game} en juego · "
-                               f"{len(self.selected)} seleccionadas")
+        self.hello_sub.setText(t("{0} cuentas guardadas · {1} en juego · {2} seleccionadas", len(self.accounts), in_game, len(self.selected)))
 
     def _update_play_button(self) -> None:
         n = len(self.selected)
-        self.play_btn.setText(f"Jugar con {n} cuenta{'s' if n != 1 else ''}" if n else "Jugar")
+        self.play_btn.setText(t("Jugar con {0} cuenta{1}", n, 's' if n != 1 else '') if n else t("Jugar"))
         self.play_btn.setEnabled(n > 0)
-        self.play_hint.setText("" if n else "Selecciona una o más cuentas arriba para lanzarlas juntas.")
+        self.play_hint.setText("" if n else t("Selecciona una o más cuentas arriba para lanzarlas juntas."))
         self.refresh_status()
 
     # ------------------------------------------------------------------ selección
@@ -441,7 +441,7 @@ class AccountsTab(Page):
         if dlg.exec():
             self.ctx.vault.upsert(dlg.account)
             self.selected.add(dlg.account.id)
-            log.info("Cuenta agregada: %s", dlg.account.alias)
+            log.info(t("Cuenta agregada: %s"), dlg.account.alias)
             self.ctx.accounts_changed.emit()
 
     def edit_account(self, acc_id: str | None) -> None:
@@ -452,7 +452,7 @@ class AccountsTab(Page):
         if dlg.exec():
             self.ctx.vault.upsert(dlg.account)
             self.ctx.manager.update_account(dlg.account)
-            log.info("Cuenta editada: %s", dlg.account.alias)
+            log.info(t("Cuenta editada: %s"), dlg.account.alias)
             self.ctx.accounts_changed.emit()
 
     def edit_current(self) -> None:
@@ -466,17 +466,17 @@ class AccountsTab(Page):
         if not targets and self.table.currentRow() >= 0:
             targets = [self._row_id(self.table.currentRow())]
         if not targets:
-            QMessageBox.information(self, "Eliminar", "Marca las cuentas que quieres eliminar.")
+            QMessageBox.information(self, t("Eliminar"), t("Marca las cuentas que quieres eliminar."))
             return
         names = ", ".join(a.alias for a in self.accounts if a.id in targets)
-        if QMessageBox.question(self, "Eliminar cuentas",
-                                f"¿Eliminar {len(targets)} cuenta(s)?\n{names}") != QMessageBox.Yes:
+        if QMessageBox.question(self, t("Eliminar cuentas"),
+                                t("¿Eliminar {0} cuenta(s)?\n{1}", len(targets), names)) != QMessageBox.Yes:
             return
         self.ctx.vault.delete(targets)
         for acc_id in targets:
             self.ctx.games.forget_account(acc_id)
         self.selected -= set(targets)
-        log.info("Eliminadas %d cuentas", len(targets))
+        log.info(t("Eliminadas %d cuentas"), len(targets))
         self.ctx.accounts_changed.emit()
 
     def _table_menu(self, pos) -> None:
@@ -485,55 +485,55 @@ class AccountsTab(Page):
         if not acc_id:
             return
         menu = QMenu(self)
-        menu.addAction("Editar", lambda: self.edit_account(acc_id))
-        menu.addAction("Lanzar solo esta", lambda: self.launch_accounts([self.ctx.vault.get(acc_id)]))
-        menu.addAction("Marcar como cuenta principal", lambda: self.set_main_account(acc_id))
+        menu.addAction(t("Editar"), lambda: self.edit_account(acc_id))
+        menu.addAction(t("Lanzar solo esta"), lambda: self.launch_accounts([self.ctx.vault.get(acc_id)]))
+        menu.addAction(t("Marcar como cuenta principal"), lambda: self.set_main_account(acc_id))
         menu.addSeparator()
 
         def _delete():
             self.selected = {acc_id}
             self.delete_selected()
 
-        menu.addAction("Eliminar", _delete)
+        menu.addAction(t("Eliminar"), _delete)
         menu.exec(self.table.viewport().mapToGlobal(pos))
 
     # ------------------------------------------------------------------ import / export
     def export_accounts(self) -> None:
         if not self.accounts:
             return
-        path, _ = QFileDialog.getSaveFileName(self, "Exportar cuentas cifradas", "cuentas.rbxvault",
-                                              "Baúl RbxFarm (*.rbxvault)")
+        path, _ = QFileDialog.getSaveFileName(self, t("Exportar cuentas cifradas"), "cuentas.rbxvault",
+                                              t("Baúl RbxFarm (*.rbxvault)"))
         if not path:
             return
         only = list(self.selected) or None
-        pw = PasswordDialog.ask(self, "Contraseña de exportación",
-                                "El archivo se cifrará con esta contraseña (la necesitarás para importarlo). "
-                                + ("Se exportarán solo las cuentas seleccionadas." if only else
-                                   "Se exportarán todas las cuentas."), confirm=True)
+        pw = PasswordDialog.ask(self, t("Contraseña de exportación"),
+                                t("El archivo se cifrará con esta contraseña (la necesitarás para importarlo). ")
+                                + (t("Se exportarán solo las cuentas seleccionadas.") if only else
+                                   t("Se exportarán todas las cuentas.")), confirm=True)
         if pw is None:
             return
         try:
             n = self.ctx.vault.export_to(path, pw, only)
-            QMessageBox.information(self, "Exportar", f"{n} cuenta(s) exportadas cifradas.")
+            QMessageBox.information(self, t("Exportar"), t("{0} cuenta(s) exportadas cifradas.", n))
         except Exception as exc:
-            QMessageBox.critical(self, "Exportar", f"No se pudo exportar: {exc}")
+            QMessageBox.critical(self, t("Exportar"), t("No se pudo exportar: {0}", exc))
 
     def import_accounts(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(self, "Importar cuentas cifradas", "", "Baúl RbxFarm (*.rbxvault);;Todos (*.*)")
+        path, _ = QFileDialog.getOpenFileName(self, t("Importar cuentas cifradas"), "", t("Baúl RbxFarm (*.rbxvault);;Todos (*.*)"))
         if not path:
             return
-        pw = PasswordDialog.ask(self, "Importar", "Contraseña con la que se exportó el archivo.")
+        pw = PasswordDialog.ask(self, t("Importar"), t("Contraseña con la que se exportó el archivo."))
         if pw is None:
             return
         try:
             added, updated = self.ctx.vault.import_from(path, pw)
         except crypto.WrongPassword:
-            QMessageBox.warning(self, "Importar", "Contraseña incorrecta.")
+            QMessageBox.warning(self, t("Importar"), t("Contraseña incorrecta."))
             return
         except Exception as exc:
-            QMessageBox.critical(self, "Importar", f"No se pudo importar: {exc}")
+            QMessageBox.critical(self, t("Importar"), t("No se pudo importar: {0}", exc))
             return
-        QMessageBox.information(self, "Importar", f"{added} nuevas, {updated} actualizadas.")
+        QMessageBox.information(self, t("Importar"), t("{0} nuevas, {1} actualizadas.", added, updated))
         self.ctx.accounts_changed.emit()
 
     # ------------------------------------------------------------------ lanzar
@@ -543,13 +543,13 @@ class AccountsTab(Page):
     def launch_accounts(self, accounts) -> None:
         accounts = [a for a in accounts if a]
         if not accounts:
-            QMessageBox.information(self, "Jugar", "Selecciona al menos una cuenta.")
+            QMessageBox.information(self, t("Jugar"), t("Selecciona al menos una cuenta."))
             return
         try:
             target = parse_target(self.link.text(), self.job.text(),
                                   self.private_code.text() if self.private_chk.isChecked() else "")
         except ValueError as exc:
-            QMessageBox.warning(self, "Jugar", str(exc))
+            QMessageBox.warning(self, t("Jugar"), str(exc))
             return
         self.ctx.cfg.set("last_link", self.link.text().strip())
         self.ctx.cfg.set("launched_once", True)

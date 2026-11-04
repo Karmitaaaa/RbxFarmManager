@@ -9,6 +9,7 @@ import os
 
 from cryptography.fernet import Fernet, InvalidToken
 from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
+from utils.i18n import t
 
 APP_TAG = "RbxFarmManager"
 SCRYPT_N, SCRYPT_R, SCRYPT_P = 2 ** 15, 8, 1
@@ -39,7 +40,7 @@ def seal(plaintext: bytes, mode: str, password: str | None = None) -> bytes:
     envelope = {"app": APP_TAG, "v": 1, "mode": mode}
     if mode == "password":
         if not password:
-            raise ValueError("Se necesita contraseña maestra")
+            raise ValueError(t("Se necesita contraseña maestra"))
         salt = os.urandom(16)
         envelope["kdf"] = {"name": "scrypt", "n": SCRYPT_N, "r": SCRYPT_R, "p": SCRYPT_P, "salt": _b64e(salt)}
         envelope["data"] = Fernet(derive_key(password, salt)).encrypt(plaintext).decode("ascii")
@@ -48,7 +49,7 @@ def seal(plaintext: bytes, mode: str, password: str | None = None) -> bytes:
         blob = win32crypt.CryptProtectData(plaintext, APP_TAG, None, None, None, 0)
         envelope["data"] = _b64e(blob)
     else:
-        raise ValueError(f"Modo desconocido: {mode}")
+        raise ValueError(t("Modo desconocido: {0}", mode))
     return json.dumps(envelope).encode("utf-8")
 
 
@@ -56,9 +57,9 @@ def read_envelope(raw: bytes) -> dict:
     try:
         env = json.loads(raw.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise BadFile("El archivo no es un contenedor válido de RbxFarm Manager") from exc
+        raise BadFile(t("El archivo no es un contenedor válido de RbxFarm Manager")) from exc
     if env.get("app") != APP_TAG or "data" not in env:
-        raise BadFile("El archivo no es un contenedor válido de RbxFarm Manager")
+        raise BadFile(t("El archivo no es un contenedor válido de RbxFarm Manager"))
     return env
 
 
@@ -70,12 +71,12 @@ def unseal(raw: bytes, password: str | None = None) -> bytes:
         try:
             return Fernet(key).decrypt(env["data"].encode("ascii"))
         except InvalidToken as exc:
-            raise WrongPassword("Contraseña incorrecta") from exc
+            raise WrongPassword(t("Contraseña incorrecta")) from exc
     if env["mode"] == "dpapi":
         import win32crypt
         try:
             _, data = win32crypt.CryptUnprotectData(_b64d(env["data"]), None, None, None, 0)
         except Exception as exc:
-            raise WrongPassword("DPAPI no pudo descifrar (¿otro usuario de Windows u otro equipo?)") from exc
+            raise WrongPassword(t("DPAPI no pudo descifrar (¿otro usuario de Windows u otro equipo?)")) from exc
         return data
-    raise BadFile(f"Modo desconocido: {env['mode']}")
+    raise BadFile(t("Modo desconocido: {0}", env['mode']))

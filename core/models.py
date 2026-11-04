@@ -3,11 +3,13 @@ import time
 import uuid
 from dataclasses import asdict, dataclass, field
 
+from utils.i18n import N_, t
+
 LOGIN_COOKIE = "cookie"
 LOGIN_CURRENT = "current"
 LOGIN_METHODS = {
-    LOGIN_COOKIE: "Sesión guardada (recomendado)",
-    LOGIN_CURRENT: "Sesión ya abierta en Roblox",
+    LOGIN_COOKIE: N_("Sesión guardada (recomendado)"),
+    LOGIN_CURRENT: N_("Sesión ya abierta en Roblox"),
 }
 
 
@@ -55,23 +57,23 @@ class LaunchTarget:
     @property
     def label(self) -> str:
         if self.private_link_code or self.share_code:
-            return f"Place {self.place_id or '?'} (privado)"
+            return t("Place {0} (privado)", self.place_id or "?")
         if self.job_id:
             return f"Place {self.place_id} / {self.job_id[:8]}…"
         return f"Place {self.place_id}"
 
 
 # Estados de instancia
-ST_LAUNCHING = "Lanzando"
-ST_OPEN = "Abierto"
-ST_INGAME = "En juego"
-ST_DISCONNECTED = "Desconectado"
-ST_ERROR = "Error"
-ST_CLOSED = "Cerrado"
-ST_WAIT_RECONNECT = "Reconectando"
-ST_WAIT_NET = "Sin internet"
-ST_FAILED = "Fallido"
-ST_STOPPED = "Detenido"
+ST_LAUNCHING = N_("Lanzando")
+ST_OPEN = N_("Abierto")
+ST_INGAME = N_("En juego")
+ST_DISCONNECTED = N_("Desconectado")
+ST_ERROR = N_("Error")
+ST_CLOSED = N_("Cerrado")
+ST_WAIT_RECONNECT = N_("Reconectando")
+ST_WAIT_NET = N_("Sin internet")
+ST_FAILED = N_("Fallido")
+ST_STOPPED = N_("Detenido")
 
 ACTIVE_STATES = {ST_LAUNCHING, ST_OPEN, ST_INGAME}
 

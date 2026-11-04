@@ -6,6 +6,7 @@ import os
 import threading
 
 from utils.paths import config_path
+from utils.i18n import t
 
 log = logging.getLogger(__name__)
 
@@ -16,6 +17,12 @@ DEFAULTS = {
     "main_account_id": "",              # cuenta que se saluda en la portada
     "download_avatars": True,           # fotos de avatar desde roblox.com
     "last_link": "",
+    "language": "",                     # "" = el idioma de Windows
+    "previews": {
+        "enabled": True,
+        "interval_s": 2,
+        "view": "cards",                # cards (con vista previa) | table
+    },
     "check_updates": True,              # buscar versiones nuevas en GitHub
     "skipped_version": "",
     "sidebar_visible": True,
@@ -105,7 +112,7 @@ class Config:
             try:
                 self.data = _merge(DEFAULTS, json.loads(self.path.read_text("utf-8")))
             except Exception as exc:
-                log.error("settings.json dañado, se usan valores por defecto: %s", exc)
+                log.error(t("settings.json dañado, se usan valores por defecto: %s"), exc)
 
     def save(self) -> None:
         with self._lock:
@@ -119,7 +126,7 @@ class Config:
             try:
                 self.save()
             except Exception as exc:
-                log.error("No se pudo guardar la configuración: %s", exc)
+                log.error(t("No se pudo guardar la configuración: %s"), exc)
 
     def get(self, dotted: str, default=None):
         node = self.data

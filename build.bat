@@ -20,6 +20,7 @@ pyinstaller --noconfirm --clean --windowed ^
   --collect-submodules pynput ^
   --hidden-import win32timezone ^
   --add-data "%~dp0VERSION;." ^
+  --add-data "%~dp0locales;locales" ^
   --distpath "%BUILD_DIR%" ^
   --workpath "%TEMP_DIR%\work" ^
   --specpath "%TEMP_DIR%" ^
