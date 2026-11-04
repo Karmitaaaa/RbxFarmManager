@@ -1,0 +1,10 @@
+# Entorno y cachés de Python
+.venv/
+__pycache__/
+*.pyc
+
+# Archivos generados al compilar
+assets/icon.ico
+build/
+dist/
+*.spec
