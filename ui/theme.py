@@ -92,6 +92,9 @@ QToolTip {{ background: #191919; color: #FFFFFF; border: none; padding: 4px 8px;
     min-width: 16px; max-height: 16px; padding: 0 4px;
 }}
 
+#UpdateBanner {{ background: {selection}; border-bottom: 1px solid {card_border}; }}
+#UpdateBanner QLabel {{ color: {selection_text}; background: transparent; }}
+
 /* ---------- barra lateral ---------- */
 #Sidebar {{ background: {sidebar}; border-right: 1px solid {card_border}; }}
 #Sidebar QLabel {{ background: transparent; }}

@@ -19,6 +19,7 @@ pyinstaller --noconfirm --clean --windowed ^
   --icon "%~dp0assets\icon.ico" ^
   --collect-submodules pynput ^
   --hidden-import win32timezone ^
+  --add-data "%~dp0VERSION;." ^
   --distpath "%BUILD_DIR%" ^
   --workpath "%TEMP_DIR%\work" ^
   --specpath "%TEMP_DIR%" ^
@@ -44,7 +45,9 @@ if not defined ISCC (
     exit /b 0
 )
 "%ISCC%" /Q /DAppVersion=%APP_VERSION% "/DBuildDir=%BUILD_DIR%" installer\RbxFarmManager.iss || goto :error
-echo Instalador: %BUILD_DIR%\Instalador\RbxFarmManager-Setup-%APP_VERSION%.exe
+"%ISCC%" /Q "/DBuildDir=%BUILD_DIR%" installer\RbxFarmManager-WebSetup.iss || goto :error
+echo Instalador completo: %BUILD_DIR%\Instalador\RbxFarmManager-Setup.exe  (version %APP_VERSION%)
+echo Instalador web:      %BUILD_DIR%\Instalador\RbxFarmManager-WebSetup.exe
 exit /b 0
 
 :error

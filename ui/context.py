@@ -13,6 +13,7 @@ from storage.games import GameProfileStore
 from storage.profiles import MacroProfileStore
 from storage.vault import Vault
 from ui.avatars import AvatarCache
+from ui.updates import UpdateChecker
 from utils.hotkeys import HotkeyManager
 
 
@@ -38,6 +39,7 @@ class AppContext(QObject):
         self.hotkeys = HotkeyManager()
         self.avatars = AvatarCache(config, vault)
         self.games = GameProfileStore()
+        self.updates = UpdateChecker(config)
         self.manager.notify.connect(self.notify)
 
     def launch_game(self, game_id: str) -> str | None:

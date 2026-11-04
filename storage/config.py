@@ -16,6 +16,8 @@ DEFAULTS = {
     "main_account_id": "",              # cuenta que se saluda en la portada
     "download_avatars": True,           # fotos de avatar desde roblox.com
     "last_link": "",
+    "check_updates": True,              # buscar versiones nuevas en GitHub
+    "skipped_version": "",
     "sidebar_visible": True,
     "hide_onboarding": False,
     "launched_once": False,

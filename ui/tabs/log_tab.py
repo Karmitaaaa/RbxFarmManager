@@ -1,6 +1,7 @@
 """Pestaña Registro / Ajustes."""
 import html
 import os
+import time
 
 from PySide6.QtWidgets import QComboBox, QFormLayout, QHBoxLayout, QMessageBox, QPlainTextEdit, QVBoxLayout
 
@@ -8,8 +9,10 @@ from storage import crypto
 from ui import bind
 from ui.context import AppContext
 from ui.dialogs import PasswordDialog
+from ui.icons import G
 from ui.widgets import Page, SectionHeader, make_card, muted_label, styled_button
 from utils.paths import app_dir, logs_dir
+from utils.version import APP_VERSION
 
 LEVEL_COLORS = {"ERROR": "#E2231A", "CRITICAL": "#E2231A", "WARNING": "#F68802"}
 FILTERS = {"all": "Todo", "warn": "Avisos y errores", "error": "Solo errores"}
@@ -77,12 +80,46 @@ class LogTab(Page):
                                   "servidores. La sesión únicamente viaja a roblox.com al lanzar."))
         lay.addWidget(styled_button("Abrir carpeta de datos", "", lambda: os.startfile(app_dir())))
         right.addWidget(card)
+
+        right.addWidget(SectionHeader("Actualizaciones"))
+        card, lay = make_card(16, 8)
+        lay.addWidget(muted_label(f"Versión instalada: {APP_VERSION}"))
+        lay.addWidget(bind.check(cfg, "check_updates", "Avisarme cuando haya una versión nueva"))
+        row = QHBoxLayout()
+        self.check_btn = styled_button("Buscar actualizaciones ahora", "secondary", self.check_updates, icon=G.SYNC)
+        row.addWidget(self.check_btn)
+        row.addStretch(1)
+        lay.addLayout(row)
+        self.update_status = muted_label("")
+        lay.addWidget(self.update_status)
+        right.addWidget(card)
         right.addStretch(1)
+        ctx.updates.finished.connect(self._update_checked)
 
         columns.addLayout(left, 3)
         columns.addLayout(right, 2)
         self.body.addLayout(columns)
         self._update_mode()
+
+    def check_updates(self) -> None:
+        self.check_btn.setEnabled(False)
+        self.update_status.setText("Buscando en GitHub…")
+        self._manual_check = True
+        self.ctx.updates.check(manual=True)
+
+    def _update_checked(self, info, error: str) -> None:
+        manual = getattr(self, "_manual_check", False)
+        self._manual_check = False
+        self.check_btn.setEnabled(True)
+        stamp = time.strftime("%H:%M")
+        if error:
+            self.update_status.setText(f"No se pudo comprobar ({stamp}): {error}")
+        elif info:
+            self.update_status.setText(f"Versión {info.version} disponible ({stamp}).")
+            if manual:
+                self.ctx.navigate.emit("update")
+        else:
+            self.update_status.setText(f"Tienes la última versión ({stamp}).")
 
     def append(self, level: str, text: str) -> None:
         self.lines.append((level, text))

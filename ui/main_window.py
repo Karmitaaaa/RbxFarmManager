@@ -6,6 +6,7 @@ from PySide6.QtGui import QAction, QCursor
 from PySide6.QtWidgets import (QApplication, QFrame, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMenu,
                                QMessageBox, QPushButton, QStackedWidget, QSystemTrayIcon, QVBoxLayout, QWidget)
 
+from core import updater
 from core.models import ACTIVE_STATES, ST_INGAME
 from ui import theme, widgets
 from ui.context import AppContext
@@ -17,7 +18,9 @@ from ui.tabs.games_tab import GamesTab
 from ui.tabs.instances_tab import InstancesTab
 from ui.tabs.log_tab import LogTab
 from ui.tabs.macros_tab import MacrosTab
+from ui.updates import UpdateBanner, UpdateDialog
 from utils.logger import ui_handler
+from utils.version import APP_VERSION
 
 log = logging.getLogger("ui")
 
@@ -93,7 +96,7 @@ class MainWindow(QMainWindow):
         self.ctx = ctx
         self._quitting = False
         self._tray_hint_shown = False
-        self.setWindowTitle("RbxFarm Manager")
+        self.setWindowTitle(f"RbxFarm Manager {APP_VERSION}")
         self.setWindowIcon(widgets.app_icon())
         self.resize(1320, 840)
         self.setMinimumSize(1000, 640)
@@ -103,6 +106,9 @@ class MainWindow(QMainWindow):
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
         root.addWidget(self._build_topbar())
+        self.update_banner = UpdateBanner()
+        self.update_banner.update_clicked.connect(self.open_update_dialog)
+        root.addWidget(self.update_banner)
         body = QHBoxLayout()
         body.setContentsMargins(0, 0, 0, 0)
         body.setSpacing(0)
@@ -151,6 +157,7 @@ class MainWindow(QMainWindow):
         ctx.manager.changed.connect(self.update_counters)
         ctx.games_changed.connect(self.update_play_button)
         ctx.clicker.state_changed.connect(self._tray_state)
+        ctx.updates.available.connect(self.on_update_available)
 
         self.autosave = QTimer(self)
         self.autosave.timeout.connect(ctx.cfg.save_if_dirty)
@@ -159,7 +166,37 @@ class MainWindow(QMainWindow):
         self.navigate("accounts")
         self.update_counters()
         self.update_play_button()
-        log.info("RbxFarm Manager listo")
+        ctx.updates.start()
+        log.info("RbxFarm Manager %s listo", APP_VERSION)
+
+    # ------------------------------------------------------------------ actualizaciones
+    def on_update_available(self, info) -> None:
+        self.update_banner.show_for(info)
+        self.ctx.notify.emit("info", f"Hay una versión nueva disponible: {info.version}")
+        if not self.isVisible():
+            self.tray.showMessage("RbxFarm Manager", f"Versión {info.version} disponible. Ábreme para actualizar.",
+                                  QSystemTrayIcon.Information, 6000)
+
+    def open_update_dialog(self) -> None:
+        info = self.ctx.updates.latest
+        if info is None:
+            self.ctx.updates.check(manual=True)
+            return
+        self.show_window()
+        UpdateDialog(info, self.ctx.cfg, self.install_update, self).exec()
+
+    def install_update(self, path) -> None:
+        """Lanza el instalador descargado y cierra la app sin preguntar: las instancias de Roblox siguen abiertas."""
+        try:
+            updater.launch_installer(path)
+        except OSError as exc:
+            QMessageBox.critical(self, "Actualizar", f"No se pudo iniciar el instalador: {exc}")
+            return
+        self._quitting = True
+        self.ctx.shutdown()
+        self.tray.hide()
+        ui_handler.sink = None
+        QApplication.instance().quit()
 
     # ------------------------------------------------------------------ construcción
     def _icon_button(self, glyph: str, tip: str, slot) -> QPushButton:
@@ -284,6 +321,9 @@ class MainWindow(QMainWindow):
     def navigate(self, target: str) -> None:
         if target.startswith("run:"):
             self._run_menu(target[4:])
+            return
+        if target == "update":
+            self.open_update_dialog()
             return
         if target.startswith("macros:"):
             self.pages["macros"].set_game_filter(target[7:])
