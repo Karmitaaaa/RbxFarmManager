@@ -1,5 +1,4 @@
 """Construcción de enlaces de lanzamiento, multi-instancia (mutex) y límite de FPS."""
-import json
 import logging
 import os
 import random
@@ -12,7 +11,7 @@ import psutil
 
 from core.models import LaunchTarget
 from utils.paths import roblox_local_dir
-from utils.winapi import ROBLOX_EXE
+from utils.winapi import ROBLOX_EXE, main_window_for_pid
 from utils.i18n import t
 
 log = logging.getLogger(__name__)
@@ -98,6 +97,29 @@ def roblox_pids() -> set[int]:
     return pids
 
 
+TRAY_ARGUMENT = "--launch-to-tray"
+
+
+def close_tray_agents(keep: set[int]) -> bool:
+    """Cierra el proceso oculto que Roblox deja en la bandeja al cerrar su ventana.
+
+    Mientras exista, los clientes nuevos le pasan el enlace y se cierran, así que no se abren varios.
+    Solo se cierra si no tiene ventana a la vista ni pertenece a una instancia (`keep`).
+    """
+    closed = False
+    for proc in psutil.process_iter(["name", "pid"]):
+        try:
+            if (proc.info["name"] == ROBLOX_EXE and proc.pid not in keep and TRAY_ARGUMENT in proc.cmdline()
+                    and not main_window_for_pid(proc.pid)):
+                proc.kill()
+                proc.wait(5)
+                closed = True
+                log.info(t("Cerrado el proceso de Roblox en la bandeja (%s)"), proc.pid)
+        except (psutil.Error, psutil.TimeoutExpired):
+            continue
+    return closed
+
+
 # --------------------------------------------------------------------------- multi-instancia
 class MultiInstanceMutex:
     """Roblox comprueba un objeto con nombre para permitir un solo cliente. Si lo creamos
@@ -142,11 +164,8 @@ class MultiInstanceMutex:
         self._handles = []
 
 
-# --------------------------------------------------------------------------- FPS
-FPS_FLAG = "DFIntTaskSchedulerTargetFps"
-
-
-def _player_version_dirs() -> list[Path]:
+# --------------------------------------------------------------------------- instalaciones
+def player_version_dirs() -> list[Path]:
     local = Path(os.environ.get("LOCALAPPDATA", ""))
     roots = [roblox_local_dir() / "Versions", local / "Bloxstrap" / "Versions", local / "Fishstrap" / "Versions"]
     dirs = []
@@ -154,25 +173,6 @@ def _player_version_dirs() -> list[Path]:
         if root.is_dir():
             dirs += [p for p in root.iterdir() if (p / ROBLOX_EXE).exists()]
     return dirs
-
-
-def apply_fps_cap(fps: int) -> int:
-    """Escribe/quita el límite de FPS en ClientAppSettings.json (se aplica al abrir la instancia)."""
-    written = 0
-    for version_dir in _player_version_dirs():
-        path = version_dir / "ClientSettings" / "ClientAppSettings.json"
-        try:
-            data = json.loads(path.read_text("utf-8")) if path.exists() else {}
-            if fps > 0:
-                data[FPS_FLAG] = int(fps)
-            else:
-                data.pop(FPS_FLAG, None)
-            path.parent.mkdir(exist_ok=True)
-            path.write_text(json.dumps(data, indent=2), "utf-8")
-            written += 1
-        except Exception as exc:
-            log.warning(t("No se pudo escribir %s: %s"), path, exc)
-    return written
 
 
 # --------------------------------------------------------------------------- logs del cliente

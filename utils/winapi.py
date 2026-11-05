@@ -386,6 +386,7 @@ dwmapi.DwmGetWindowAttribute.argtypes = (wintypes.HWND, wintypes.DWORD, ctypes.c
 dwmapi.DwmGetWindowAttribute.restype = ctypes.c_long
 
 DWMWA_EXTENDED_FRAME_BOUNDS = 9
+SWP_NOSENDCHANGING = 0x0400     # sin esto Roblox impone su mínimo de 800 × 600 al cambiar de tamaño
 MONITORINFOF_PRIMARY = 1
 MONITOR_DEFAULTTONEAREST = 2
 
@@ -447,6 +448,36 @@ def _frame_margins(hwnd: int) -> tuple[int, int, int, int]:
     return rect.left - outer[0], rect.top - outer[1], outer[2] - rect.right, outer[3] - rect.bottom
 
 
+class PROCESS_POWER_THROTTLING_STATE(ctypes.Structure):
+    _fields_ = [("Version", wintypes.ULONG), ("ControlMask", wintypes.ULONG), ("StateMask", wintypes.ULONG)]
+
+
+kernel32.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+kernel32.OpenProcess.restype = wintypes.HANDLE
+kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
+kernel32.SetProcessInformation.argtypes = (wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD)
+kernel32.SetProcessInformation.restype = wintypes.BOOL
+
+PROCESS_SET_INFORMATION = 0x0200
+PROCESS_POWER_THROTTLING = 4        # ProcessPowerThrottling
+THROTTLE_EXECUTION_SPEED = 1
+
+
+def set_efficiency_mode(pid: int, enabled: bool) -> bool:
+    """Activa o quita el modo de eficiencia de Windows (EcoQoS) de un proceso."""
+    handle = kernel32.OpenProcess(PROCESS_SET_INFORMATION, False, pid)
+    if not handle:
+        return False
+    # Con control 0 Windows vuelve a decidir solo, en vez de prohibir el ahorro
+    mask = THROTTLE_EXECUTION_SPEED if enabled else 0
+    state = PROCESS_POWER_THROTTLING_STATE(1, mask, mask)
+    try:
+        return bool(kernel32.SetProcessInformation(handle, PROCESS_POWER_THROTTLING, ctypes.byref(state),
+                                                   ctypes.sizeof(state)))
+    finally:
+        kernel32.CloseHandle(handle)
+
+
 def visible_rect(hwnd: int) -> tuple[int, int, int, int] | None:
     """Lo que se ve de la ventana (x, y, ancho, alto), sin el borde invisible."""
     try:
@@ -462,7 +493,7 @@ def place_window(hwnd: int, x: int, y: int, width: int, height: int, after: int 
 
     x, y, width y height se refieren a la parte visible, para que las ventanas queden juntas de verdad.
     Con `after` la deja justo debajo de esa otra ventana; sin él no cambia cuál está delante.
-    Devuelve None si no se pudo. El tamaño puede salir mayor si la ventana tiene un mínimo propio.
+    Devuelve None si no se pudo.
     """
     try:
         if is_minimized(hwnd) or is_maximized(hwnd):
@@ -471,7 +502,7 @@ def place_window(hwnd: int, x: int, y: int, width: int, height: int, after: int 
         target = (x - left, y - top, width + left + right, height + top + bottom)
         now = win32gui.GetWindowRect(hwnd)
         current = (now[0], now[1], now[2] - now[0], now[3] - now[1])
-        flags = win32con.SWP_NOACTIVATE | win32con.SWP_NOOWNERZORDER
+        flags = win32con.SWP_NOACTIVATE | win32con.SWP_NOOWNERZORDER | SWP_NOSENDCHANGING
         if after is None:
             flags |= win32con.SWP_NOZORDER
         if current != target or after is not None:

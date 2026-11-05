@@ -14,7 +14,7 @@ import time
 import psutil
 from PySide6.QtCore import QObject, Signal
 
-from core import launcher, roblox_api, window_layout
+from core import launcher, performance, roblox_api, window_layout
 from core.models import (ACTIVE_STATES, LOGIN_COOKIE, ST_CLOSED, ST_DISCONNECTED, ST_ERROR, ST_FAILED,
                          ST_INGAME, ST_LAUNCHING, ST_OPEN, ST_STOPPED, ST_WAIT_NET, ST_WAIT_RECONNECT,
                          Account, GameProfile, Instance, LaunchTarget)
@@ -54,7 +54,7 @@ class InstanceManager(QObject):
 
     def start(self) -> None:
         if self.cfg.get("launch.multi_instance"):
-            self.mutex.acquire()
+            self._prepare_multi_instance()
         for t in self._threads:
             t.start()
 
@@ -206,6 +206,30 @@ class InstanceManager(QObject):
         if inst and winapi.is_window(inst.hwnd):
             winapi.maximize(inst.hwnd)
 
+    def apply_performance(self) -> None:
+        """Guarda los ajustes en los archivos de Roblox y aplica al momento los del procesador."""
+        performance.apply(self.cfg)
+        procs = list(self._procs.values())
+        for index, proc in enumerate(procs):
+            self._limit_process(proc, index)
+        self.cfg.save_if_dirty()
+        self.notify.emit("info", t("Ajustes aplicados. Reinicia las ventanas abiertas para ver los cambios de "
+                                   "FPS y gráficos.") if procs else t("Ajustes aplicados a las próximas ventanas"))
+
+    def _limit_process(self, proc: psutil.Process, index: int) -> None:
+        """Prioridad, modo de eficiencia y núcleos: lo mismo que se puede cambiar desde el Administrador de tareas."""
+        section = self.cfg.section("performance")
+        total = psutil.cpu_count() or 1
+        cores = int(section.get("cores") or 0)
+        # Cada ventana usa núcleos distintos para que no se estorben entre ellas
+        allowed = ([(index * cores + i) % total for i in range(cores)] if 0 < cores < total else list(range(total)))
+        try:
+            proc.nice(psutil.BELOW_NORMAL_PRIORITY_CLASS if section.get("low_priority") else psutil.NORMAL_PRIORITY_CLASS)
+            proc.cpu_affinity(allowed)
+        except psutil.Error as exc:
+            log.warning(t("No se pudieron cambiar los límites del proceso %s: %s"), proc.pid, exc)
+        winapi.set_efficiency_mode(proc.pid, bool(section.get("efficiency")))
+
     def focus(self, inst_id: str) -> bool:
         inst = self.get(inst_id)
         return bool(inst and inst.hwnd and winapi.focus_window(inst.hwnd))
@@ -219,7 +243,7 @@ class InstanceManager(QObject):
 
     def set_multi_instance(self, enabled: bool) -> None:
         if enabled:
-            self.mutex.acquire()
+            self._prepare_multi_instance()
         else:
             self.mutex.release()
 
@@ -237,6 +261,11 @@ class InstanceManager(QObject):
                 proc.kill()
             except psutil.Error:
                 pass
+
+    def _prepare_multi_instance(self) -> None:
+        if launcher.close_tray_agents(self._claimed_pids()):
+            self.mutex.release()  # lo tenía la bandeja: hay que volver a crearlo para que sea nuestro
+        self.mutex.acquire()
 
     def _reset_for_launch(self, inst: Instance) -> None:
         inst.pid = inst.hwnd = None
@@ -282,10 +311,8 @@ class InstanceManager(QObject):
         self._reset_for_launch(inst)
         acc, target = inst.account, inst.target
         if self.cfg.get("launch.multi_instance"):
-            self.mutex.acquire()
-        fps = int(self.cfg.get("launch.fps_cap", 0) or 0)
-        if fps:
-            launcher.apply_fps_cap(fps)
+            self._prepare_multi_instance()
+        performance.apply(self.cfg)
 
         inst.detail = t("Preparando inicio de sesión")
         self.changed.emit()
@@ -326,11 +353,7 @@ class InstanceManager(QObject):
         if not inst.pid:
             raise RuntimeError(t("Roblox no se abrió a tiempo"))
 
-        if self.cfg.get("launch.low_priority"):
-            try:
-                self._procs[inst.pid].nice(psutil.BELOW_NORMAL_PRIORITY_CLASS)
-            except psutil.Error:
-                pass
+        self._limit_process(self._procs[inst.pid], len(self._procs) - 1)
         inst.status, inst.detail = ST_OPEN, t("Cargando")
         log.info(t("%s: proceso %s abierto"), acc.alias, inst.pid)
 

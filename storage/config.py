@@ -35,6 +35,23 @@ DEFAULTS = {
         "auto_arrange": False,
         "panel_open": True,
     },
+    "performance": {
+        "preset": "normal",             # normal | balanced | saver | max_saver | custom
+        "fps": 0,                       # 0 = sin cambios
+        "quality": 0,                   # 0 = sin cambios, 1 a 10
+        "low_textures": False,
+        "no_grass": False,
+        "no_antialiasing": False,
+        "low_detail": False,
+        "simple_lighting": False,
+        "gray_sky": False,
+        "mute": False,
+        "low_priority": False,
+        "efficiency": False,
+        "cores": 0,                     # 0 = todos
+        "panel_open": True,
+        "original": {},                 # valores de Roblox que hay que devolver al volver a Normal
+    },
     "check_updates": True,              # buscar versiones nuevas en GitHub
     "skipped_version": "",
     "sidebar_visible": True,
@@ -43,8 +60,6 @@ DEFAULTS = {
     "launch": {
         "delay_s": 8,                   # espera entre lanzamientos
         "multi_instance": True,
-        "fps_cap": 0,                   # 0 = sin límite
-        "low_priority": False,
         "auto_minimize": False,
         "rename_windows": True,
         "pid_timeout_s": 60,
@@ -123,8 +138,20 @@ class Config:
         if self.path.exists():
             try:
                 self.data = _merge(DEFAULTS, json.loads(self.path.read_text("utf-8")))
+                self._migrate()
             except Exception as exc:
                 log.error(t("settings.json dañado, se usan valores por defecto: %s"), exc)
+
+    def _migrate(self) -> None:
+        """Ajustes de versiones anteriores que ahora están en «performance»."""
+        launch, perf = self.data["launch"], self.data["performance"]
+        old_fps = launch.pop("fps_cap", 0)
+        if old_fps and not perf["fps"]:
+            perf["fps"] = min((30, 60, 120, 144, 240), key=lambda value: abs(value - old_fps))
+            perf["preset"] = "custom"
+        if launch.pop("low_priority", False):
+            perf["low_priority"] = True
+            perf["preset"] = "custom"
 
     def save(self) -> None:
         with self._lock:

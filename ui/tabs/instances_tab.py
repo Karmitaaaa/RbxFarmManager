@@ -4,13 +4,13 @@ from PySide6.QtGui import QImage
 from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QFormLayout, QHBoxLayout, QHeaderView, QLabel,
                                QMessageBox, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget)
 
-from core import launcher
 from core.models import (ST_FAILED, ST_INGAME, ST_LAUNCHING, ST_OPEN, ST_STOPPED, ST_WAIT_NET,
                          ST_WAIT_RECONNECT)
 from ui import bind, theme
 from ui.context import AppContext
 from ui.icons import G
 from ui.instance_card import InstanceCard
+from ui.performance_panel import PerformancePanel
 from ui.widgets import (EmptyState, FlowLayout, IconCircle, Page, SectionHeader, StatusPill, clear_layout,
                         make_card, muted_label, styled_button)
 from ui.window_panel import WindowPanel
@@ -98,31 +98,29 @@ class InstancesTab(Page):
         lay.addWidget(self.table)
         self.body.addWidget(card)
 
-        # ---------------- rendimiento
-        self.body.addWidget(SectionHeader(t("Rendimiento y lanzamiento")))
+        # ---------------- calidad y rendimiento
+        performance_header = SectionHeader(t("Calidad y rendimiento"))
+        self.performance_link = performance_header.add_link("", self.toggle_performance)
+        self.body.addWidget(performance_header)
+        self.performance_panel = PerformancePanel(ctx)
+        self.body.addWidget(self.performance_panel)
+        self._apply_performance_state()
+
+        # ---------------- lanzamiento
+        self.body.addWidget(SectionHeader(t("Lanzamiento y vista previa")))
         card, lay = make_card(16, 8)
         form = QFormLayout()
         form.setHorizontalSpacing(14)
         cfg = ctx.cfg
-        fps_row = QHBoxLayout()
-        self.fps = bind.spin(cfg, "launch.fps_cap", 0, 360, " FPS")
-        self.fps.setSpecialValueText(t("Sin límite"))
-        fps_row.addWidget(self.fps)
-        fps_row.addWidget(styled_button(t("Aplicar ahora"), "secondary", self.apply_fps))
-        fps_row.addStretch(1)
-        form.addRow(t("Límite de FPS"), fps_row)
         form.addRow(t("Espera entre lanzamientos"), bind.spin(cfg, "launch.delay_s", 0, 120, " s"))
         form.addRow(t("Tiempo máx. para detectar el proceso"), bind.spin(cfg, "launch.pid_timeout_s", 15, 300, " s"))
         form.addRow("", bind.check(cfg, "launch.multi_instance", t("Permitir varias instancias (mutex de un solo cliente)"),
                                    ctx.manager.set_multi_instance))
         form.addRow("", bind.check(cfg, "launch.auto_minimize", t("Minimizar las ventanas al abrirse")))
-        form.addRow("", bind.check(cfg, "launch.low_priority", t("Prioridad de CPU baja para ahorrar recursos")))
         form.addRow("", bind.check(cfg, "launch.rename_windows", t("Poner el alias en el título de cada ventana")))
         form.addRow("", bind.check(cfg, "previews.enabled", t("Mostrar la vista previa de las ventanas")))
         form.addRow(t("Actualizar la vista previa cada"), bind.spin(cfg, "previews.interval_s", 1, 30, " s"))
         lay.addLayout(form)
-        lay.addWidget(muted_label(t("El límite de FPS se escribe en ClientAppSettings.json de Roblox y afecta a las "
-                                  "instancias que abras a partir de ahora. Si usas Bloxstrap, ajústalo también allí.")))
         self.body.addWidget(card)
         self.body.addStretch(1)
 
@@ -149,6 +147,15 @@ class InstancesTab(Page):
         self.window_panel.setVisible(opened)
         self.panel_link.setText(t("Ocultar") if opened else t("Mostrar"))
 
+    def toggle_performance(self) -> None:
+        self.ctx.cfg.set("performance.panel_open", not self.ctx.cfg.get("performance.panel_open", True))
+        self._apply_performance_state()
+
+    def _apply_performance_state(self) -> None:
+        opened = bool(self.ctx.cfg.get("performance.panel_open", True))
+        self.performance_panel.setVisible(opened)
+        self.performance_link.setText(t("Ocultar") if opened else t("Mostrar"))
+
     def _new_frame(self, inst_id: str, image: QImage) -> None:
         self.frames[inst_id] = image
         if inst_id in self.cards:
@@ -173,13 +180,6 @@ class InstancesTab(Page):
         else:
             for inst in instances:
                 self.cards[inst.id].refresh(inst)
-
-    def apply_fps(self) -> None:
-        n = launcher.apply_fps_cap(self.fps.value())
-        if n:
-            QMessageBox.information(self, "FPS", t("Límite aplicado en {0} instalación(es) de Roblox. Reinicia las instancias para que surta efecto.", n))
-        else:
-            QMessageBox.warning(self, "FPS", t("No se encontró ninguna instalación de Roblox Player."))
 
     def close_all(self) -> None:
         if QMessageBox.question(self, t("Cerrar todas"), t("¿Cerrar todas las instancias de Roblox?")) == QMessageBox.Yes:

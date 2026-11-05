@@ -40,12 +40,15 @@ To uninstall, use Windows «Add or remove programs» (your data in `%APPDATA%\Rb
 - **Game profiles:** pick a game (or private server), which accounts join and which macro or autoclicker
   preset they use, then press **Play**. The real game name and icon are fetched from Roblox.
 - **Multi-instance:** several Roblox clients at once, with status (launching, open, in game, reconnecting…),
-  CPU/RAM, FPS cap, low CPU priority and auto-minimize.
+  CPU/RAM and auto-minimize.
 - **Live window previews:** each instance is a card with a picture of its window; click it to bring the
   window to the front. You can switch to the compact table view or turn previews off.
 - **Window organizer:** arrange every client in a grid, row, column or cascade on the monitor you choose,
   fill the screen or pick a size (presets or custom), set columns, spacing and order, see a live sketch of
   the result, and optionally arrange new windows automatically. Each card can also resize its own window.
+- **Quality and performance:** profiles from Normal to Maximum saver, or your own mix: FPS limit, graphics
+  quality, low textures, no grass, no anti-aliasing, less model detail, simple lighting, mute, low CPU
+  priority, Windows efficiency mode and cores per window. The Normal profile restores your Roblox settings.
 - **Anti-AFK** with randomized intervals, **auto-reconnect** with exponential back-off (detects crashes,
   error dialogs, server disconnections and internet loss), **autoclicker** and **macro recorder/player**
   with global hotkeys.
@@ -119,6 +122,7 @@ RbxFarmManager/
 │  ├─ updater.py            GitHub Releases update check, download and install
 │  ├─ previews.py           Captures the window previews in the background
 │  ├─ window_layout.py      Calculates and applies window positions and sizes
+│  ├─ performance.py        Roblox quality, FPS and sound settings
 │  ├─ anti_afk.py           Anti-AFK
 │  ├─ autoclicker.py        Autoclicker
 │  ├─ macro.py              Macro recorder and player
@@ -140,6 +144,7 @@ RbxFarmManager/
 │  ├─ updates.py            Update banner and update dialog
 │  ├─ instance_card.py      Instance card with its window preview
 │  ├─ window_panel.py       «Arrange windows» panel with its layout sketch
+│  ├─ performance_panel.py  «Quality and performance» panel
 │  ├─ main_window.py        Top bar, sidebar, tray, hotkeys
 │  └─ tabs/                 Home, Games, Instances, Anti-AFK, Autoclicker, Macros, Log
 └─ utils/
