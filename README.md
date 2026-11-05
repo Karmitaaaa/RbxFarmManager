@@ -43,6 +43,9 @@ To uninstall, use Windows «Add or remove programs» (your data in `%APPDATA%\Rb
   CPU/RAM, FPS cap, low CPU priority and auto-minimize.
 - **Live window previews:** each instance is a card with a picture of its window; click it to bring the
   window to the front. You can switch to the compact table view or turn previews off.
+- **Window organizer:** arrange every client in a grid, row, column or cascade on the monitor you choose,
+  fill the screen or pick a size (presets or custom), set columns, spacing and order, see a live sketch of
+  the result, and optionally arrange new windows automatically. Each card can also resize its own window.
 - **Anti-AFK** with randomized intervals, **auto-reconnect** with exponential back-off (detects crashes,
   error dialogs, server disconnections and internet loss), **autoclicker** and **macro recorder/player**
   with global hotkeys.
@@ -115,6 +118,7 @@ RbxFarmManager/
 │  ├─ reconnect.py          Back-off, disconnection detection, internet check
 │  ├─ updater.py            GitHub Releases update check, download and install
 │  ├─ previews.py           Captures the window previews in the background
+│  ├─ window_layout.py      Calculates and applies window positions and sizes
 │  ├─ anti_afk.py           Anti-AFK
 │  ├─ autoclicker.py        Autoclicker
 │  ├─ macro.py              Macro recorder and player
@@ -135,6 +139,7 @@ RbxFarmManager/
 │  ├─ game_dialog.py        Game profile editor
 │  ├─ updates.py            Update banner and update dialog
 │  ├─ instance_card.py      Instance card with its window preview
+│  ├─ window_panel.py       «Arrange windows» panel with its layout sketch
 │  ├─ main_window.py        Top bar, sidebar, tray, hotkeys
 │  └─ tabs/                 Home, Games, Instances, Anti-AFK, Autoclicker, Macros, Log
 └─ utils/

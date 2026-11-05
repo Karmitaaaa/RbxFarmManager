@@ -14,7 +14,7 @@ import time
 import psutil
 from PySide6.QtCore import QObject, Signal
 
-from core import launcher, roblox_api
+from core import launcher, roblox_api, window_layout
 from core.models import (ACTIVE_STATES, LOGIN_COOKIE, ST_CLOSED, ST_DISCONNECTED, ST_ERROR, ST_FAILED,
                          ST_INGAME, ST_LAUNCHING, ST_OPEN, ST_STOPPED, ST_WAIT_NET, ST_WAIT_RECONNECT,
                          Account, GameProfile, Instance, LaunchTarget)
@@ -45,6 +45,8 @@ class InstanceManager(QObject):
         self._stop = threading.Event()
         self.online = True
         self._last_net_check = 0.0
+        self._arrange_lock = threading.Lock()
+        self._arrange_pending = False
         self._threads = [
             threading.Thread(target=self._launch_loop, name="launcher", daemon=True),
             threading.Thread(target=self._monitor_loop, name="monitor", daemon=True),
@@ -131,6 +133,78 @@ class InstanceManager(QObject):
         if inst and winapi.is_window(inst.hwnd):
             winapi.minimize(inst.hwnd)
             self.changed.emit()
+
+    def restore_all(self) -> None:
+        for inst in self.window_instances():
+            if winapi.is_minimized(inst.hwnd):
+                winapi.show_no_activate(inst.hwnd)
+        self.changed.emit()
+
+    def ordered(self) -> list[Instance]:
+        """Las instancias en el orden elegido en «Organizar ventanas»."""
+        instances = self.snapshot()
+        order = self.cfg.get("windows.order", "list")
+        if order == "account":
+            instances.sort(key=lambda i: i.account.alias.casefold())
+        elif order == "game":
+            instances.sort(key=lambda i: ((i.profile_name or i.target.label).casefold(),
+                                          i.account.alias.casefold()))
+        return instances
+
+    def window_instances(self, include_minimized: bool = True) -> list[Instance]:
+        return [i for i in self.ordered() if winapi.is_window(i.hwnd)
+                and (include_minimized or not winapi.is_minimized(i.hwnd))]
+
+    def move_in_list(self, inst_id: str, delta: int) -> None:
+        with self._lock:
+            ids = list(self._instances)
+            old = ids.index(inst_id)
+            new = max(0, min(old + delta, len(ids) - 1))
+            ids.insert(new, ids.pop(old))
+            self._instances = {i: self._instances[i] for i in ids}
+        self.changed.emit()
+
+    def arrange(self, manual: bool = True) -> None:
+        """Ordena las ventanas en otro hilo: una ventana colgada no debe congelar la aplicación."""
+        threading.Thread(target=self._arrange, args=(manual,), name="ventanas", daemon=True).start()
+
+    def _arrange(self, manual: bool) -> None:
+        if not self._arrange_lock.acquire(blocking=False):
+            return
+        try:
+            # Al ordenar solas, las minimizadas se quedan como están
+            hwnds = [i.hwnd for i in self.window_instances(include_minimized=manual)]
+            result = window_layout.arrange(hwnds, dict(self.cfg.section("windows")))
+        except Exception:
+            log.exception("Fallo al ordenar las ventanas")
+            return
+        finally:
+            self._arrange_lock.release()
+        log.info(t("%d ventanas ordenadas"), result.placed)
+        if manual:
+            self._report_arrange(result)
+        self.changed.emit()
+
+    def _report_arrange(self, result: window_layout.ArrangeResult) -> None:
+        if not result.placed:
+            self.notify.emit("warning", t("No hay ninguna ventana que ordenar"))
+        elif result.limited:
+            self.notify.emit("warning", t("Algunas ventanas no aceptan un tamaño tan pequeño: se usó el más pequeño posible"))
+        elif result.overlap:
+            self.notify.emit("warning", t("No caben todas en el monitor con ese tamaño: algunas quedan superpuestas"))
+        else:
+            self.notify.emit("info", t("{0} ventanas ordenadas", result.placed))
+
+    def resize_window(self, inst_id: str, width: int, height: int) -> None:
+        inst = self.get(inst_id)
+        if inst and winapi.is_window(inst.hwnd):
+            threading.Thread(target=window_layout.resize, args=(inst.hwnd, width, height), name="ventanas",
+                             daemon=True).start()
+
+    def maximize(self, inst_id: str) -> None:
+        inst = self.get(inst_id)
+        if inst and winapi.is_window(inst.hwnd):
+            winapi.maximize(inst.hwnd)
 
     def focus(self, inst_id: str) -> bool:
         inst = self.get(inst_id)
@@ -267,9 +341,15 @@ class InstanceManager(QObject):
                 self._check_network()
                 for inst in self.snapshot():
                     self._check_instance(inst)
+                self._auto_arrange()
             except Exception:
                 log.exception("Error en el monitor de instancias")
             self.changed.emit()
+
+    def _auto_arrange(self) -> None:
+        pending, self._arrange_pending = self._arrange_pending, False
+        if pending and self.cfg.get("windows.auto_arrange") and not self.cfg.get("launch.auto_minimize"):
+            self.arrange(manual=False)
 
     def _check_network(self) -> None:
         if not self.cfg.get("reconnect.check_internet"):
@@ -331,6 +411,7 @@ class InstanceManager(QObject):
                     winapi.set_title(inst.hwnd, f"Roblox - {inst.account.alias}")
                 if self.cfg.get("launch.auto_minimize"):
                     winapi.minimize(inst.hwnd)
+                self._arrange_pending = True
 
         # Diálogos nativos de error/crash
         dialogs = winapi.error_dialogs_for_pid(inst.pid)
@@ -354,6 +435,7 @@ class InstanceManager(QObject):
             if inst.status != ST_INGAME:
                 inst.status, inst.detail = ST_INGAME, ""
                 log.info(t("%s: en juego (%s)"), inst.account.alias, inst.target.label)
+                self._arrange_pending = True  # al terminar de cargar, Roblox puede cambiar su ventana
                 self.joined.emit(inst.id)
             if inst.retries and now - inst.joined_at > float(rc.get("reset_after_s", 300)):
                 inst.retries = 0

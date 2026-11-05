@@ -5,6 +5,7 @@ from PySide6.QtCore import QRectF, Qt, Signal
 from PySide6.QtGui import QColor, QCursor, QFont, QImage, QPainter, QPainterPath
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QMenu, QPushButton, QSizePolicy, QVBoxLayout, QWidget
 
+from core.window_layout import SIZE_PRESETS
 from ui import theme
 from ui.context import AppContext
 from ui.icons import G, glyph_icon, icon_font
@@ -172,11 +173,31 @@ class InstanceCard(QFrame):
     def _menu(self) -> None:
         manager, inst_id = self.ctx.manager, self.inst_id
         menu = QMenu(self)
+        self._size_menu(menu)
+        by_hand = self.ctx.cfg.get("windows.order", "list") == "list"
+        for text, delta in ((t("Mover antes"), -1), (t("Mover después"), 1)):
+            action = menu.addAction(text, lambda _=False, d=delta: manager.move_in_list(inst_id, d))
+            action.setEnabled(by_hand)
+        menu.addSeparator()
         menu.addAction(glyph_icon(G.REFRESH), t("Reiniciar"), lambda: manager.restart(inst_id))
         menu.addAction(glyph_icon(G.STOP, theme.ACCENTS["red"]), t("Cerrar instancia"), lambda: manager.close(inst_id))
         menu.addSeparator()
         menu.addAction(glyph_icon(G.CLOSE), t("Quitar de la lista"), lambda: manager.remove(inst_id))
         menu.exec(QCursor.pos())
+
+    def _size_menu(self, menu: QMenu) -> None:
+        manager, inst_id = self.ctx.manager, self.inst_id
+        sizes = menu.addMenu(glyph_icon(G.MONITOR), t("Tamaño de la ventana"))
+        inst = manager.get(inst_id)
+        sizes.setEnabled(bool(inst and winapi.is_window(inst.hwnd)))
+        for width, height in SIZE_PRESETS:
+            sizes.addAction(f"{width} × {height}",
+                            lambda _=False, w=width, h=height: manager.resize_window(inst_id, w, h))
+        width, height = int(self.ctx.cfg.get("windows.width", 800)), int(self.ctx.cfg.get("windows.height", 600))
+        sizes.addAction(t("Personalizado ({0} × {1})", width, height),
+                        lambda: manager.resize_window(inst_id, width, height))
+        sizes.addSeparator()
+        sizes.addAction(t("Maximizar"), lambda: manager.maximize(inst_id))
 
     def set_image(self, image: QImage) -> None:
         self.preview.set_image(image)

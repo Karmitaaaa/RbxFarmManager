@@ -9,6 +9,7 @@ import threading
 import time
 from ctypes import wintypes
 
+import win32api
 import win32con
 import win32gui
 import win32process
@@ -377,3 +378,106 @@ def post_key(hwnd: int, vk: int, hold: float = 0.06) -> None:
     win32gui.PostMessage(hwnd, win32con.WM_KEYDOWN, vk, lparam_down)
     time.sleep(hold)
     win32gui.PostMessage(hwnd, win32con.WM_KEYUP, vk, lparam_up)
+
+
+# --------------------------------------------------------------------------- Posición y tamaño
+dwmapi = ctypes.WinDLL("dwmapi")
+dwmapi.DwmGetWindowAttribute.argtypes = (wintypes.HWND, wintypes.DWORD, ctypes.c_void_p, wintypes.DWORD)
+dwmapi.DwmGetWindowAttribute.restype = ctypes.c_long
+
+DWMWA_EXTENDED_FRAME_BOUNDS = 9
+MONITORINFOF_PRIMARY = 1
+MONITOR_DEFAULTTONEAREST = 2
+
+
+def _monitor_dict(handle) -> dict:
+    info = win32api.GetMonitorInfo(handle)
+    left, top, right, bottom = info["Monitor"]
+    work = info["Work"]
+    return {"device": info["Device"], "width": right - left, "height": bottom - top,
+            "primary": bool(info["Flags"] & MONITORINFOF_PRIMARY),
+            "x": work[0], "y": work[1], "w": work[2] - work[0], "h": work[3] - work[1]}
+
+
+def monitors() -> list[dict]:
+    """Monitores con el principal primero. x, y, w, h son el área útil (sin la barra de tareas), en píxeles reales."""
+    found = []
+    try:
+        found = [_monitor_dict(entry[0]) for entry in win32api.EnumDisplayMonitors()]
+    except Exception as exc:
+        log.debug("No se pudieron listar los monitores: %s", exc)
+    return sorted(found, key=lambda m: (not m["primary"], m["device"]))
+
+
+def monitor_of(hwnd: int) -> dict | None:
+    try:
+        return _monitor_dict(win32api.MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST))
+    except Exception:
+        return None
+
+
+def is_maximized(hwnd: int) -> bool:
+    try:
+        return win32gui.GetWindowPlacement(hwnd)[1] == win32con.SW_SHOWMAXIMIZED
+    except Exception:
+        return False
+
+
+def show_no_activate(hwnd: int) -> None:
+    """Saca la ventana de minimizada o maximizada sin quitarle el foco a nadie."""
+    try:
+        win32gui.ShowWindow(hwnd, win32con.SW_SHOWNOACTIVATE)
+    except Exception as exc:
+        log.debug("No se pudo mostrar %s: %s", hwnd, exc)
+
+
+def maximize(hwnd: int) -> None:
+    try:
+        win32gui.ShowWindow(hwnd, win32con.SW_MAXIMIZE)
+    except Exception as exc:
+        log.debug("No se pudo maximizar %s: %s", hwnd, exc)
+
+
+def _frame_margins(hwnd: int) -> tuple[int, int, int, int]:
+    """Borde invisible que Windows añade alrededor de la ventana (izquierda, arriba, derecha, abajo)."""
+    outer = win32gui.GetWindowRect(hwnd)
+    rect = wintypes.RECT()
+    if dwmapi.DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, ctypes.byref(rect), ctypes.sizeof(rect)):
+        return 0, 0, 0, 0
+    return rect.left - outer[0], rect.top - outer[1], outer[2] - rect.right, outer[3] - rect.bottom
+
+
+def visible_rect(hwnd: int) -> tuple[int, int, int, int] | None:
+    """Lo que se ve de la ventana (x, y, ancho, alto), sin el borde invisible."""
+    try:
+        left, top, right, bottom = win32gui.GetWindowRect(hwnd)
+        m_left, m_top, m_right, m_bottom = _frame_margins(hwnd)
+    except Exception:
+        return None
+    return left + m_left, top + m_top, right - left - m_left - m_right, bottom - top - m_top - m_bottom
+
+
+def place_window(hwnd: int, x: int, y: int, width: int, height: int, after: int | None = None) -> tuple[int, int] | None:
+    """Coloca la ventana sin darle el foco y devuelve el tamaño que acabó teniendo.
+
+    x, y, width y height se refieren a la parte visible, para que las ventanas queden juntas de verdad.
+    Con `after` la deja justo debajo de esa otra ventana; sin él no cambia cuál está delante.
+    Devuelve None si no se pudo. El tamaño puede salir mayor si la ventana tiene un mínimo propio.
+    """
+    try:
+        if is_minimized(hwnd) or is_maximized(hwnd):
+            show_no_activate(hwnd)
+        left, top, right, bottom = _frame_margins(hwnd)
+        target = (x - left, y - top, width + left + right, height + top + bottom)
+        now = win32gui.GetWindowRect(hwnd)
+        current = (now[0], now[1], now[2] - now[0], now[3] - now[1])
+        flags = win32con.SWP_NOACTIVATE | win32con.SWP_NOOWNERZORDER
+        if after is None:
+            flags |= win32con.SWP_NOZORDER
+        if current != target or after is not None:
+            win32gui.SetWindowPos(hwnd, after or 0, *target, flags)
+    except Exception as exc:
+        log.debug("No se pudo colocar %s: %s", hwnd, exc)
+        return None
+    rect = visible_rect(hwnd)
+    return (rect[2], rect[3]) if rect else None

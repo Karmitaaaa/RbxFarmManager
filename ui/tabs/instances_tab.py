@@ -13,6 +13,7 @@ from ui.icons import G
 from ui.instance_card import InstanceCard
 from ui.widgets import (EmptyState, FlowLayout, IconCircle, Page, SectionHeader, StatusPill, clear_layout,
                         make_card, muted_label, styled_button)
+from ui.window_panel import WindowPanel
 from utils.i18n import N_, t
 
 COLS = [N_("Cuenta"), N_("Estado"), N_("Detalle"), "PID", "CPU", "RAM", N_("Juego"), N_("Reint."), "Anti-AFK", N_("Reconexión"), N_("Acciones")]
@@ -54,6 +55,14 @@ class InstancesTab(Page):
         row.addWidget(self.mutex_label)
         stats_lay.addLayout(row)
         self.body.addWidget(stats_card)
+
+        # ---------------- organizar ventanas
+        windows_header = SectionHeader(t("Organizar ventanas"))
+        self.panel_link = windows_header.add_link("", self.toggle_panel)
+        self.body.addWidget(windows_header)
+        self.window_panel = WindowPanel(ctx)
+        self.body.addWidget(self.window_panel)
+        self._apply_panel_state()
 
         # ---------------- tabla
         self.header = SectionHeader(t("Instancias (0)"))
@@ -125,10 +134,20 @@ class InstancesTab(Page):
     def showEvent(self, event):
         super().showEvent(event)
         self.ctx.previews.set_active(True)
+        self.window_panel.reload_monitors()
 
     def hideEvent(self, event):
         super().hideEvent(event)
         self.ctx.previews.set_active(False)
+
+    def toggle_panel(self) -> None:
+        self.ctx.cfg.set("windows.panel_open", not self.ctx.cfg.get("windows.panel_open", True))
+        self._apply_panel_state()
+
+    def _apply_panel_state(self) -> None:
+        opened = bool(self.ctx.cfg.get("windows.panel_open", True))
+        self.window_panel.setVisible(opened)
+        self.panel_link.setText(t("Ocultar") if opened else t("Mostrar"))
 
     def _new_frame(self, inst_id: str, image: QImage) -> None:
         self.frames[inst_id] = image
@@ -228,7 +247,7 @@ class InstancesTab(Page):
                 inst.next_afk_at = 0.0
 
     def refresh(self) -> None:
-        instances = self.ctx.manager.snapshot()
+        instances = self.ctx.manager.ordered()
         ids = [i.id for i in instances]
         # Reconstruye si cambiaron las filas (altas/bajas); si no, actualiza en sitio
         if list(self.rows.keys()) != ids:
@@ -275,6 +294,7 @@ class InstancesTab(Page):
         self.header.set_title(t("Instancias ({0})", len(instances)))
         cards_view = self.ctx.cfg.get("previews.view", "cards") == "cards"
         self._refresh_cards(instances)
+        self.window_panel.update_preview()
         self.empty.setVisible(not instances)
         self.cards_host.setVisible(bool(instances) and cards_view)
         self.table_card.setVisible(bool(instances) and not cards_view)

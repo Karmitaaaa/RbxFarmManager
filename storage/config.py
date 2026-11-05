@@ -23,6 +23,18 @@ DEFAULTS = {
         "interval_s": 2,
         "view": "cards",                # cards (con vista previa) | table
     },
+    "windows": {
+        "mode": "grid",                 # grid | row | column | cascade
+        "size": "fit",                  # fit | custom | 800x600…
+        "width": 800,                   # tamaño personalizado
+        "height": 600,
+        "columns": 0,                   # 0 = automático
+        "gap": 0,
+        "monitor": "",                  # "" = el principal
+        "order": "list",                # list | account | game
+        "auto_arrange": False,
+        "panel_open": True,
+    },
     "check_updates": True,              # buscar versiones nuevas en GitHub
     "skipped_version": "",
     "sidebar_visible": True,
